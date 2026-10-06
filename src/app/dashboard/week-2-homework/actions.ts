@@ -20,6 +20,42 @@ import {
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 
+/**
+ * Replace one submitter's moving-day picks wholesale. Delete and insert share
+ * a transaction: a failed insert must not leave the submitter with no picks.
+ */
+async function replaceMovingDayPicks(
+    seasonId: number,
+    submitterId: string,
+    entries: {
+        player: string
+        direction: (typeof movingDay.$inferInsert)["direction"]
+        is_forced: boolean
+    }[]
+): Promise<void> {
+    await db.transaction(async (tx) => {
+        await tx
+            .delete(movingDay)
+            .where(
+                and(
+                    eq(movingDay.season, seasonId),
+                    eq(movingDay.submitted_by, submitterId)
+                )
+            )
+        if (entries.length > 0) {
+            await tx.insert(movingDay).values(
+                entries.map((e) => ({
+                    season: seasonId,
+                    submitted_by: submitterId,
+                    player: e.player,
+                    direction: e.direction,
+                    is_forced: e.is_forced
+                }))
+            )
+        }
+    })
+}
+
 export interface Week2Player {
     userId: string
     firstName: string
@@ -688,26 +724,7 @@ export const submitWeek2Homework = withAction(
             }
         }
 
-        await db
-            .delete(movingDay)
-            .where(
-                and(
-                    eq(movingDay.season, config.seasonId),
-                    eq(movingDay.submitted_by, sessionUser.id)
-                )
-            )
-
-        if (entries.length > 0) {
-            await db.insert(movingDay).values(
-                entries.map((e) => ({
-                    season: config.seasonId as number,
-                    submitted_by: sessionUser.id,
-                    player: e.player,
-                    direction: e.direction,
-                    is_forced: e.is_forced
-                }))
-            )
-        }
+        await replaceMovingDayPicks(config.seasonId, sessionUser.id, entries)
 
         // The delete above replaces this submitter's picks wholesale, so the
         // entry records the resulting set rather than the fact of a save.
@@ -851,26 +868,7 @@ export const submitCoachWeek2Homework = withAction(
             }
         }
 
-        await db
-            .delete(movingDay)
-            .where(
-                and(
-                    eq(movingDay.season, config.seasonId),
-                    eq(movingDay.submitted_by, sessionUser.id)
-                )
-            )
-
-        if (entries.length > 0) {
-            await db.insert(movingDay).values(
-                entries.map((e) => ({
-                    season: config.seasonId as number,
-                    submitted_by: sessionUser.id,
-                    player: e.player,
-                    direction: e.direction,
-                    is_forced: e.is_forced
-                }))
-            )
-        }
+        await replaceMovingDayPicks(config.seasonId, sessionUser.id, entries)
 
         // The delete above replaces this submitter's picks wholesale, so the
         // entry records the resulting set rather than the fact of a save.

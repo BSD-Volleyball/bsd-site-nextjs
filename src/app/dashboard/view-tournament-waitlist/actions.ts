@@ -93,11 +93,6 @@ export const expressTournamentInterest = withAction(
             resolvedDivisionId = div.id
         }
 
-        await recordWaiverAcceptance(session.user.id, active.id)
-
-        // Insert if new; otherwise update the preferred division (player may
-        // re-submit with a different preference). Preserve placed_team_id
-        // and approved if already set.
         const [existing] = await db
             .select({ id: tournamentWaitlist.id })
             .from(tournamentWaitlist)
@@ -108,19 +103,33 @@ export const expressTournamentInterest = withAction(
                 )
             )
             .limit(1)
-        if (!existing) {
-            await db.insert(tournamentWaitlist).values({
-                tournament_id: config.tournamentId,
-                user_id: session.user.id,
-                waiver_id: active.id,
-                preferred_division_id: resolvedDivisionId
-            })
-        } else {
-            await db
-                .update(tournamentWaitlist)
-                .set({ preferred_division_id: resolvedDivisionId })
-                .where(eq(tournamentWaitlist.id, existing.id))
-        }
+
+        // Waiver acceptance and the waitlist row land together. Upsert on
+        // (tournament, user): a new row, or a re-submission that only changes
+        // the preferred division, keeping placed_team_id and approved.
+        await db.transaction(async (tx) => {
+            await recordWaiverAcceptance(
+                session.user.id,
+                active.id,
+                undefined,
+                tx
+            )
+            await tx
+                .insert(tournamentWaitlist)
+                .values({
+                    tournament_id: config.tournamentId,
+                    user_id: session.user.id,
+                    waiver_id: active.id,
+                    preferred_division_id: resolvedDivisionId
+                })
+                .onConflictDoUpdate({
+                    target: [
+                        tournamentWaitlist.tournament_id,
+                        tournamentWaitlist.user_id
+                    ],
+                    set: { preferred_division_id: resolvedDivisionId }
+                })
+        })
         await logAuditEntry({
             userId: session.user.id,
             action: existing
@@ -408,21 +417,22 @@ export const placeWaitlistPlayerOnTeam = withAction(
         }
 
         try {
-            await db.insert(tournamentRoster).values({
-                tournament_id: entry.tournament_id,
-                team_id: teamId,
-                user_id: entry.user_id,
-                added_by_user_id: session.user.id
+            await db.transaction(async (tx) => {
+                await tx.insert(tournamentRoster).values({
+                    tournament_id: entry.tournament_id,
+                    team_id: teamId,
+                    user_id: entry.user_id,
+                    added_by_user_id: session.user.id
+                })
+                await tx
+                    .update(tournamentWaitlist)
+                    .set({ placed_team_id: teamId, approved: true })
+                    .where(eq(tournamentWaitlist.id, waitlistId))
             })
         } catch (e) {
             console.error("placeWaitlistPlayerOnTeam failed:", e)
             return fail("Could not place player (may already be on a team).")
         }
-
-        await db
-            .update(tournamentWaitlist)
-            .set({ placed_team_id: teamId, approved: true })
-            .where(eq(tournamentWaitlist.id, waitlistId))
 
         await logAuditEntry({
             userId: session.user.id,

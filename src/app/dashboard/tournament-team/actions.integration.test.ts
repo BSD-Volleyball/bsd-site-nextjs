@@ -179,3 +179,46 @@ describe("addPlayerToRoster / removePlayerFromRoster", () => {
         expect(rows).toHaveLength(0)
     })
 })
+
+describe("addPlayerToRoster division caps", () => {
+    it("refuses a player who would exceed the division's gender cap", async () => {
+        const tournament = await createTournament()
+        const leagueDivision = await createDivision({ name: "B", level: 3 })
+        const tournamentDivision = await createTournamentDivision({
+            tournament_id: tournament.id,
+            division_id: leagueDivision.id,
+            male_per_team: 1,
+            non_male_per_team: 2
+        })
+        await createWaiver()
+        const captain = await createUser({ male: true })
+        const team = await createTournamentTeam({
+            tournament_id: tournament.id,
+            preferred_division_id: tournamentDivision.id,
+            captain_user_id: captain.id,
+            name: "Capped"
+        })
+        await addToTournamentRoster({
+            tournament_id: tournament.id,
+            team_id: team.id,
+            user_id: captain.id,
+            added_by_user_id: captain.id
+        })
+        loginAs(captain)
+
+        const secondMale = await createUser({ male: true })
+        const refused = await addPlayerToRoster(secondMale.id)
+        expect(refused.status).toBe(false)
+        if (!refused.status) expect(refused.message).toContain("male cap")
+
+        const nonMale = await createUser({ male: false })
+        expect((await addPlayerToRoster(nonMale.id)).status).toBe(true)
+    })
+
+    it("refuses an id that is not a user", async () => {
+        const { captain } = await seedCaptainTeam()
+        loginAs(captain)
+        const result = await addPlayerToRoster("no-such-user")
+        expect(result.status).toBe(false)
+    })
+})

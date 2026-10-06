@@ -6,7 +6,15 @@ import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
-import { eq, and, or, isNull, isNotNull, inArray } from "drizzle-orm"
+import {
+    eq,
+    and,
+    or,
+    isNull,
+    isNotNull,
+    inArray,
+    TransactionRollbackError
+} from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -606,31 +614,39 @@ export const assignPairPartner = withAction(
                 )
             }
 
-            await db
-                .update(signups)
-                .set({
-                    pair: true,
-                    pair_pick: partnerId
+            // Both sides or neither, and only while both are still unpaired:
+            // the checks above can race another reviewer pairing one of them.
+            const seasonId = config.seasonId
+            const paired = await db
+                .transaction(async (tx) => {
+                    const pairWith = (player: string, partner: string) =>
+                        tx
+                            .update(signups)
+                            .set({ pair: true, pair_pick: partner })
+                            .where(
+                                and(
+                                    eq(signups.season, seasonId),
+                                    eq(signups.player, player),
+                                    isNull(signups.pair_pick)
+                                )
+                            )
+                            .returning({ id: signups.id })
+                    const first = await pairWith(requesterId, partnerId)
+                    const second = await pairWith(partnerId, requesterId)
+                    if (first.length === 0 || second.length === 0) {
+                        tx.rollback()
+                    }
+                    return true
                 })
-                .where(
-                    and(
-                        eq(signups.season, config.seasonId),
-                        eq(signups.player, requesterId)
-                    )
-                )
-
-            await db
-                .update(signups)
-                .set({
-                    pair: true,
-                    pair_pick: requesterId
+                .catch((error) => {
+                    if (error instanceof TransactionRollbackError) return false
+                    throw error
                 })
-                .where(
-                    and(
-                        eq(signups.season, config.seasonId),
-                        eq(signups.player, partnerId)
-                    )
+            if (!paired) {
+                return fail(
+                    "One of these players was just paired by someone else. Refresh and try again."
                 )
+            }
 
             await logAuditEntry({
                 userId: actorId,

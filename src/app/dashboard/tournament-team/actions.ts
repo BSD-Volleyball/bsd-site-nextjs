@@ -4,6 +4,7 @@ import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
+    divisions,
     tournamentDivisions,
     tournamentRoster,
     tournamentTeams,
@@ -253,6 +254,65 @@ export const updatePreferredDivision = withAction(
     }
 )
 
+/**
+ * Would adding this player push the team past its division's male or
+ * non-male cap? Registration checks the whole roster against the caps
+ * (validateRosterAgainstDivision); adding players one at a time afterwards
+ * must respect the same limits. Returns an error message, or null.
+ */
+async function rosterCapError(
+    team: {
+        id: number
+        division_id: number | null
+        preferred_division_id: number
+    },
+    userId: string
+): Promise<string | null> {
+    const [player] = await db
+        .select({ male: users.male })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+    if (!player) return "Player not found."
+
+    const [division] = await db
+        .select({
+            name: divisions.name,
+            malePerTeam: tournamentDivisions.male_per_team,
+            nonMalePerTeam: tournamentDivisions.non_male_per_team
+        })
+        .from(tournamentDivisions)
+        .innerJoin(divisions, eq(divisions.id, tournamentDivisions.division_id))
+        .where(
+            eq(
+                tournamentDivisions.id,
+                team.division_id ?? team.preferred_division_id
+            )
+        )
+        .limit(1)
+    if (!division) return null
+
+    const roster = await db
+        .select({ male: users.male })
+        .from(tournamentRoster)
+        .innerJoin(users, eq(users.id, tournamentRoster.user_id))
+        .where(eq(tournamentRoster.team_id, team.id))
+    const males =
+        roster.filter((r) => r.male === true).length +
+        (player.male === true ? 1 : 0)
+    const nonMales =
+        roster.filter((r) => r.male === false).length +
+        (player.male === false ? 1 : 0)
+
+    if (males > division.malePerTeam) {
+        return `Roster would exceed the male cap (${males} / ${division.malePerTeam}) for ${division.name}.`
+    }
+    if (nonMales > division.nonMalePerTeam) {
+        return `Roster would exceed the non-male cap (${nonMales} / ${division.nonMalePerTeam}) for ${division.name}.`
+    }
+    return null
+}
+
 export const addPlayerToRoster = withAction(
     async (userId: string): Promise<ActionResult<void>> => {
         const session = await requireSession()
@@ -279,29 +339,38 @@ export const addPlayerToRoster = withAction(
         if (already)
             return fail("Player is already on a team in this tournament.")
 
+        const capError = await rosterCapError(team, userId)
+        if (capError) return fail(capError)
+
         try {
-            await db.insert(tournamentRoster).values({
-                tournament_id: config.tournamentId,
-                team_id: team.id,
-                user_id: userId,
-                added_by_user_id: session.user.id
+            await db.transaction(async (tx) => {
+                await tx.insert(tournamentRoster).values({
+                    tournament_id: config.tournamentId,
+                    team_id: team.id,
+                    user_id: userId,
+                    added_by_user_id: session.user.id
+                })
+
+                // If the player is on the waitlist, mark them as placed on
+                // this team. (We update rather than delete so the
+                // pre-acceptance record stays.)
+                await tx
+                    .update(tournamentWaitlist)
+                    .set({ placed_team_id: team.id, approved: true })
+                    .where(
+                        and(
+                            eq(
+                                tournamentWaitlist.tournament_id,
+                                config.tournamentId
+                            ),
+                            eq(tournamentWaitlist.user_id, userId)
+                        )
+                    )
             })
         } catch (e) {
             console.error("addPlayerToRoster failed:", e)
             return fail("Could not add player.")
         }
-
-        // If the player is on the waitlist, mark them as placed on this team.
-        // (We update rather than delete so the pre-acceptance record stays.)
-        await db
-            .update(tournamentWaitlist)
-            .set({ placed_team_id: team.id, approved: true })
-            .where(
-                and(
-                    eq(tournamentWaitlist.tournament_id, config.tournamentId),
-                    eq(tournamentWaitlist.user_id, userId)
-                )
-            )
 
         await logAuditEntry({
             userId: session.user.id,
@@ -333,28 +402,34 @@ export const removePlayerFromRoster = withAction(
         )
         if (!team) return fail("Team not found.")
 
-        await db
-            .delete(tournamentRoster)
-            .where(
-                and(
-                    eq(tournamentRoster.team_id, team.id),
-                    eq(tournamentRoster.user_id, userId)
+        await db.transaction(async (tx) => {
+            await tx
+                .delete(tournamentRoster)
+                .where(
+                    and(
+                        eq(tournamentRoster.team_id, team.id),
+                        eq(tournamentRoster.user_id, userId)
+                    )
                 )
-            )
 
-        // If the removed player was previously placed on this team via the
-        // waitlist, mark them available again so a captain (or admin) can
-        // pick them up. Don't touch rows placed on a *different* team.
-        await db
-            .update(tournamentWaitlist)
-            .set({ placed_team_id: null })
-            .where(
-                and(
-                    eq(tournamentWaitlist.tournament_id, config.tournamentId),
-                    eq(tournamentWaitlist.user_id, userId),
-                    eq(tournamentWaitlist.placed_team_id, team.id)
+            // If the removed player was previously placed on this team via
+            // the waitlist, mark them available again so a captain (or
+            // admin) can pick them up. Don't touch rows placed on a
+            // *different* team.
+            await tx
+                .update(tournamentWaitlist)
+                .set({ placed_team_id: null })
+                .where(
+                    and(
+                        eq(
+                            tournamentWaitlist.tournament_id,
+                            config.tournamentId
+                        ),
+                        eq(tournamentWaitlist.user_id, userId),
+                        eq(tournamentWaitlist.placed_team_id, team.id)
+                    )
                 )
-            )
+        })
 
         await logAuditEntry({
             userId: session.user.id,

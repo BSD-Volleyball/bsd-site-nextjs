@@ -1151,34 +1151,38 @@ export const setPairDiff = withAction(
         }
 
         // Delete both possible orderings to handle rating-order changes from prior saves
-        await db
-            .delete(draftPairDiffs)
-            .where(
-                and(
-                    eq(draftPairDiffs.season, seasonId),
-                    eq(draftPairDiffs.division, input.divisionId),
-                    or(
-                        and(
-                            eq(draftPairDiffs.player1, input.player1Id),
-                            eq(draftPairDiffs.player2, input.player2Id)
-                        ),
-                        and(
-                            eq(draftPairDiffs.player1, input.player2Id),
-                            eq(draftPairDiffs.player2, input.player1Id)
+        // Replace the pair's saved diff in one step, so a failed insert never
+        // leaves the pair with no diff at all.
+        await db.transaction(async (tx) => {
+            await tx
+                .delete(draftPairDiffs)
+                .where(
+                    and(
+                        eq(draftPairDiffs.season, seasonId),
+                        eq(draftPairDiffs.division, input.divisionId),
+                        or(
+                            and(
+                                eq(draftPairDiffs.player1, input.player1Id),
+                                eq(draftPairDiffs.player2, input.player2Id)
+                            ),
+                            and(
+                                eq(draftPairDiffs.player1, input.player2Id),
+                                eq(draftPairDiffs.player2, input.player1Id)
+                            )
                         )
                     )
                 )
-            )
 
-        // Insert with player1 = higher-rated, player2 = lower-rated
-        await db.insert(draftPairDiffs).values({
-            season: seasonId,
-            division: input.divisionId,
-            saved_by: userId,
-            player1: input.player1Id,
-            player2: input.player2Id,
-            diff: input.diff,
-            updated_at: new Date()
+            // Insert with player1 = higher-rated, player2 = lower-rated
+            await tx.insert(draftPairDiffs).values({
+                season: seasonId,
+                division: input.divisionId,
+                saved_by: userId,
+                player1: input.player1Id,
+                player2: input.player2Id,
+                diff: input.diff,
+                updated_at: new Date()
+            })
         })
 
         await logAuditEntry({
