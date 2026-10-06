@@ -70,3 +70,4 @@ workers/**/worker-configuration.d.ts
 # Subagent-driven-development scratch workspace
 .superpowers/
 __pycache__/
+.vitest/

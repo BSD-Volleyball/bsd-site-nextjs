@@ -16,6 +16,11 @@ export default defineConfig({
         tsconfigPaths: true
     },
     test: {
+        // The two projects alias "@/database/db" to different modules (a
+        // guard that throws vs. the cloned test database), so they must never
+        // share a Vite server and its transform cache. Defining `resolve`
+        // already opts each out; this keeps it that way if that moves.
+        sharedViteServer: false,
         coverage: {
             provider: "v8",
             include: ["src/**"],
