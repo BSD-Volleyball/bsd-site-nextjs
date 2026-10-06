@@ -1,5 +1,6 @@
 {
     "installCommand": "pnpm install --frozen-lockfile",
+    "buildCommand": "pnpm build",
     "crons": [
         {
             "path": "/api/cron/game-reminders",
