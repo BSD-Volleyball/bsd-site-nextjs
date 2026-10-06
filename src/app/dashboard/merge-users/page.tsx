@@ -1,7 +1,7 @@
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { MergeUsersForm } from "./merge-users-form"
-import { getMergeableUsers } from "./actions"
+import { getMergeableUsers } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

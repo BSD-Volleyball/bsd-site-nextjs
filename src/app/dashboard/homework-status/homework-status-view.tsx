@@ -13,11 +13,11 @@ import {
     DialogDescription
 } from "@/components/ui/dialog"
 import type {
-    DivisionStatus,
     RatePlayersDetailResult,
     MovingDayDetailResult,
     DraftHomeworkDetailResult
 } from "./actions"
+import type { DivisionStatus } from "./data"
 import {
     getRatePlayersDetail,
     getMovingDayDetail,

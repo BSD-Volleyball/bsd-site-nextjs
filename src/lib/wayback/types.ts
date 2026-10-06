@@ -153,7 +153,7 @@ export interface PlayoffMatch {
  * Gillick -- the recorded champion -- won the final.
  *
  * That makes it the right source for teams.rank, which seed-playoffs.ts also
- * treats as the regular-season seed and next-match-actions.ts reads back to
+ * treats as the regular-season seed and next-match-data.ts reads back to
  * resolve "S1".."S6" bracket sources.
  */
 export interface SeedRow {

@@ -1,11 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import {
-    getSignupsCsvData,
-    getPlayerDetailsPublic,
-    type SignupGroup
-} from "./actions"
+import { getSignupsCsvData, getPlayerDetailsPublic } from "./actions"
+import type { SignupGroup } from "./data"
 import { Button } from "@/components/ui/button"
 import { RiDownloadLine } from "@remixicon/react"
 import {

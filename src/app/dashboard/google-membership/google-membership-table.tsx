@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
 import { googleMembershipOptions } from "@/lib/google-membership"
-import { updateGoogleMembership, type GoogleMembershipUser } from "./actions"
+import { updateGoogleMembership } from "./actions"
+import type { GoogleMembershipUser } from "./data"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatPlayerName } from "@/lib/utils"
 

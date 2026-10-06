@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PlayerLookupSignupsForm } from "./player-lookup-form"
-import { getSignedUpPlayers } from "./actions"
+import { getSignedUpPlayers } from "./data"
 import { requireCaptainAccessOrRedirect } from "@/next/page-guards"
 import type { Metadata } from "next"
 

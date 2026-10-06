@@ -1,11 +1,8 @@
 "use client"
 
 import { useEffect, useId, useMemo, useRef, useState } from "react"
-import type {
-    MergeAccountSnapshot,
-    MergeCandidates,
-    UserOption
-} from "./actions"
+import type { MergeAccountSnapshot, MergeCandidates } from "./actions"
+import type { UserOption } from "./data"
 import { getMergeCandidateDetails, mergeUsers } from "./actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"

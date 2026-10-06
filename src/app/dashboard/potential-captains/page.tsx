@@ -3,7 +3,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { PotentialCaptainsList } from "./potential-captains-list"
-import { getPotentialCaptainsData } from "./actions"
+import { getPotentialCaptainsData } from "./data"
 
 import type { Metadata } from "next"
 

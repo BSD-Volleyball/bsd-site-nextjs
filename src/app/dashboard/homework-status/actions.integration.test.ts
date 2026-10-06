@@ -3,7 +3,7 @@ import { db } from "@/database/db"
 import { individual_divisions, movingDay } from "@/database/schema"
 import { createDivision, createSeason, createTeam } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getHomeworkStatusData } from "./actions"
+import { getHomeworkStatusData } from "./data"
 
 // Seeds a season with a top division (AA, level 1) and a lower division
 // (A, level 2), one captained team in each. Top/bottom status must be derived

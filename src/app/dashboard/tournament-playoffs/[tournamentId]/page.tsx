@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { DivisionLabel } from "@/app/dashboard/tournament-schedule-view/schedule-view"
 import { TournamentPlacementsCard } from "@/components/tournament/tournament-placements-card"
 import { BracketView } from "@/components/playoffs/bracket-view"
-import { getTournamentPlayoffs } from "./actions"
+import { getTournamentPlayoffs } from "./data"
 
 export const metadata: Metadata = {
     title: "Tournament Playoffs"

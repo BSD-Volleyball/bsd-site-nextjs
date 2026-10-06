@@ -3,7 +3,7 @@ import { listFriendIds } from "@/lib/friends"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
-import { getRosterData } from "./actions"
+import { getRosterData } from "./data"
 import { RosterDivisionSection } from "./roster-division-section"
 import type { Metadata } from "next"
 

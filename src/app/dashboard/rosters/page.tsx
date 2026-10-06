@@ -6,7 +6,7 @@ import { listFriendIds } from "@/lib/friends"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import { getSeasonConfig } from "@/lib/site-config"
 import type { Metadata } from "next"
-import { getRosterData } from "./[seasonId]/actions"
+import { getRosterData } from "./[seasonId]/data"
 import { RosterDivisionSection } from "./[seasonId]/roster-division-section"
 
 export const metadata: Metadata = {

@@ -4,10 +4,9 @@ import { PlayerLookupColumns } from "@/components/player-lookup/player-lookup-co
 import { PlayerDetailPopup } from "@/components/player-detail"
 import {
     getPlayerDetailsForSignups,
-    type PlayerDetailsForSignups,
-    type PlayerListItem,
-    type SeasonInfo
+    type PlayerDetailsForSignups
 } from "./actions"
+import type { PlayerListItem, SeasonInfo } from "./data"
 
 interface PlayerLookupSignupsFormProps {
     players: PlayerListItem[]

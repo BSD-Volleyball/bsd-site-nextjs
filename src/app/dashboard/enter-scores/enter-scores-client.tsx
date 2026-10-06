@@ -22,11 +22,11 @@ import {
     type DivisionMatchGroup,
     finalizeScoreSheetUpload,
     getMatchesForDate,
-    type MatchDateOption,
     type MatchScoreInput,
     type ScoreSheetData,
     saveScoresForDivision
 } from "./actions"
+import type { MatchDateOption } from "./data"
 import { DivisionScoreCard } from "./division-score-card"
 import {
     initFormState,

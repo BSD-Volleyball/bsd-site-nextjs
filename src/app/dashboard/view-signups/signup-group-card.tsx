@@ -3,7 +3,7 @@
 import type { ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatHeight } from "@/components/player-detail"
-import type { SignupGroup } from "./actions"
+import type { SignupGroup } from "./data"
 
 interface SignupGroupCardProps {
     group: SignupGroup

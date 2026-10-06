@@ -30,12 +30,8 @@ import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { toast } from "sonner"
 import { formatMatchTimeOrDash } from "@/lib/date-utils"
 import { getMatchesAndRefsForDate, saveRefAssignments } from "./actions"
-import type {
-    MatchDate,
-    MatchRow,
-    EligibleRef,
-    MatchesAndRefsData
-} from "./actions"
+import type { MatchRow, EligibleRef, MatchesAndRefsData } from "./actions"
+import type { MatchDate } from "./data"
 
 // ---------------------------------------------------------------------------
 // Props

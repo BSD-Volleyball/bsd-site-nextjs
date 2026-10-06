@@ -7,7 +7,7 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card"
-import { getAccountProfile } from "../settings/actions"
+import { getAccountProfile } from "../settings/data"
 import { AccountForm } from "./account-form"
 import { requireSessionOrRedirect } from "@/next/page-guards"
 

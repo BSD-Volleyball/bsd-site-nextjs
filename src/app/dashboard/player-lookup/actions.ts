@@ -60,7 +60,7 @@ import {
     type PlayerScheduleData,
     type PlayerScheduleEntry
 } from "@/lib/player-schedule-types"
-import { getPlayoffNextMatches } from "@/app/dashboard/next-match-actions"
+import { getPlayoffNextMatches } from "@/app/dashboard/next-match-data"
 
 export interface PlayerListItem {
     id: string

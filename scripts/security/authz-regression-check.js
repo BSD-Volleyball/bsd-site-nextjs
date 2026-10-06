@@ -38,7 +38,7 @@ const callerAuthenticatedLoaders = new Set([
 
 const strictExpectations = [
     {
-        key: "src/app/dashboard/view-signups/actions.ts:getSignupsData",
+        key: "src/app/dashboard/view-signups/data.ts:getSignupsData",
         pattern: /hasCaptainPagesAccessBySession\s*\(/,
         description: "must gate access via hasCaptainPagesAccessBySession"
     },
@@ -53,7 +53,7 @@ const strictExpectations = [
         description: "must gate access via isCommissionerBySession"
     },
     {
-        key: "src/app/dashboard/rosters/[seasonId]/actions.ts:getRosterData",
+        key: "src/app/dashboard/rosters/[seasonId]/data.ts:getRosterData",
         pattern: /requireSession\s*\(/,
         description: "must require an authenticated session via requireSession"
     },
@@ -103,15 +103,15 @@ const strictExpectations = [
     }
 ]
 
-// A file is scanned when it is named *actions.ts or data.ts, OR when its
-// content starts with a "use server" directive (server actions can live in
-// any filename).
+// A file is scanned when it is named *actions.ts, data.ts or *-data.ts, OR
+// when its content starts with a "use server" directive (server actions can
+// live in any filename).
 function isServerActionFile(fullPath, name) {
     if (name.endsWith("actions.ts")) return true
     // Server-only data loaders (data.ts) are not endpoints, but they are the
     // reads pages render from; their exported functions must still guard
     // access, so they are held to the same rule.
-    if (name === "data.ts") return true
+    if (name === "data.ts" || name.endsWith("-data.ts")) return true
     if (!name.endsWith(".ts")) return false
     const content = fs.readFileSync(fullPath, "utf8")
     return /^["']use server["']/.test(content.trimStart())

@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
-import { getInsuranceReportYears } from "./actions"
+import { getInsuranceReportYears } from "./data"
 import { InsuranceReportClient } from "./insurance-report-client"
 
 export default async function InsuranceReportPage() {

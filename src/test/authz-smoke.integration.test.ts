@@ -30,7 +30,6 @@ import { createSeason } from "@/test/factories"
 import * as addPictures from "@/app/dashboard/add-pictures/actions"
 import * as addTeamPictures from "@/app/dashboard/add-team-pictures/actions"
 import * as adminViewSignups from "@/app/dashboard/admin-view-signups/actions"
-import * as attrition from "@/app/dashboard/attrition/actions"
 import * as auditLog from "@/app/dashboard/audit-log/actions"
 import * as captainPairing from "@/app/dashboard/captain-pairing/actions"
 import * as createWeek1 from "@/app/dashboard/create-week-1/actions"
@@ -49,15 +48,12 @@ import * as googleMembership from "@/app/dashboard/google-membership/actions"
 import * as homeworkStatus from "@/app/dashboard/homework-status/actions"
 import * as manageEmails from "@/app/dashboard/manage-emails/actions"
 import * as myAvailability from "@/app/dashboard/my-availability/actions"
-import * as nextMatch from "@/app/dashboard/next-match-actions"
 import * as playerLookup from "@/app/dashboard/player-lookup/actions"
 import * as playerLookupSignups from "@/app/dashboard/player-lookup-signups/actions"
 import * as playoffs from "@/app/dashboard/playoffs/[seasonId]/actions"
-import * as potentialCaptains from "@/app/dashboard/potential-captains/actions"
 import * as ratePlayer from "@/app/dashboard/rate-player/actions"
 import * as reffingSchedule from "@/app/dashboard/reffing-schedule/actions"
 import * as reviewPairs from "@/app/dashboard/review-pairs/actions"
-import * as rosters from "@/app/dashboard/rosters/[seasonId]/actions"
 import * as scheduleRefs from "@/app/dashboard/schedule-refs/actions"
 import * as seasonScheduleById from "@/app/dashboard/schedule/[seasonId]/actions"
 import * as seasonSchedule from "@/app/dashboard/season-schedule/actions"
@@ -66,7 +62,6 @@ import * as teamAvailability from "@/app/dashboard/team-availability/actions"
 import * as findSub from "@/app/dashboard/team-availability/find-sub-actions"
 import * as tournamentControl from "@/app/dashboard/tournament-control/actions"
 import * as tournamentOverview from "@/app/dashboard/tournament-overview/actions"
-import * as tournamentPlayoffs from "@/app/dashboard/tournament-playoffs/[tournamentId]/actions"
 import * as tournamentRosters from "@/app/dashboard/tournament-rosters/[tournamentId]/actions"
 import * as tournamentSchedule from "@/app/dashboard/tournament-schedule/actions"
 import * as tournamentScheduleView from "@/app/dashboard/tournament-schedule-view/actions"
@@ -78,16 +73,31 @@ import * as week2Homework from "@/app/dashboard/week-2-homework/actions"
 import * as onboardingVolleyball from "@/app/onboarding/volleyball-profile/actions"
 import * as addPicturesData from "@/app/dashboard/add-pictures/data"
 import * as adminViewSignupsData from "@/app/dashboard/admin-view-signups/data"
+import * as attritionData from "@/app/dashboard/attrition/data"
 import * as createWeek3Data from "@/app/dashboard/create-week-3/data"
 import * as draftDayData from "@/app/dashboard/draft-setup/order/data"
+import * as editEmailsData from "@/app/dashboard/edit-emails/data"
 import * as editWeek2Data from "@/app/dashboard/edit-week-2/data"
+import * as editWeek3Data from "@/app/dashboard/edit-week-3/data"
 import * as evaluatePlayersData from "@/app/dashboard/evaluate-players/data"
+import * as googleMembershipData from "@/app/dashboard/google-membership/data"
+import * as homeworkStatusData from "@/app/dashboard/homework-status/data"
+import * as nextMatchData from "@/app/dashboard/next-match-data"
+import * as playerLookupSignupsData from "@/app/dashboard/player-lookup-signups/data"
+import * as potentialCaptainsData from "@/app/dashboard/potential-captains/data"
 import * as ratePlayerData from "@/app/dashboard/rate-player/data"
 import * as reviewPairsData from "@/app/dashboard/review-pairs/data"
+import * as rostersData from "@/app/dashboard/rosters/[seasonId]/data"
+import * as scheduleRefsData from "@/app/dashboard/schedule-refs/data"
+import * as settingsData from "@/app/dashboard/settings/data"
 import * as tournamentControlData from "@/app/dashboard/tournament-control/data"
+import * as tournamentOverviewData from "@/app/dashboard/tournament-overview/data"
+import * as tournamentPlayoffsData from "@/app/dashboard/tournament-playoffs/[tournamentId]/data"
 import * as tournamentPoolPlayData from "@/app/dashboard/tournament-pool-play/[tournamentId]/data"
+import * as viewSignupsData from "@/app/dashboard/view-signups/data"
 import * as viewTournamentWaitlistData from "@/app/dashboard/view-tournament-waitlist/data"
 import * as viewWaitlistData from "@/app/dashboard/view-waitlist/data"
+import * as week2HomeworkData from "@/app/dashboard/week-2-homework/data"
 
 type Kind = "fail" | "null" | "emptyArray" | "false" | "void"
 
@@ -142,7 +152,9 @@ const cases: SmokeCase[] = [
         adminViewSignupsData.getSeasonDrops()
     ),
     // attrition / audit-log / captain-pairing
-    c("attrition.getAttritionData", "fail", () => attrition.getAttritionData()),
+    c("attrition.getAttritionData", "fail", () =>
+        attritionData.getAttritionData()
+    ),
     c("auditLog.getAuditLogs", "fail", () => auditLog.getAuditLogs()),
     c("captainPairing.updateSignupPreferences", "fail", () =>
         captainPairing.updateSignupPreferences(1, {} as never)
@@ -192,7 +204,7 @@ const cases: SmokeCase[] = [
     ),
     // edit-emails
     c("editEmails.getEmailTemplates", "fail", () =>
-        editEmails.getEmailTemplates()
+        editEmailsData.getEmailTemplates()
     ),
     c("editEmails.updateEmailTemplate", "fail", () =>
         editEmails.updateEmailTemplate(1, "n", null, {} as never)
@@ -237,7 +249,9 @@ const cases: SmokeCase[] = [
     c("editWeek2.sendWeek2RosterNotifications", "fail", () =>
         editWeek2.sendWeek2RosterNotifications([], [], "")
     ),
-    c("editWeek3.getEditWeek3Data", "fail", () => editWeek3.getEditWeek3Data()),
+    c("editWeek3.getEditWeek3Data", "fail", () =>
+        editWeek3Data.getEditWeek3Data()
+    ),
     c("editWeek3.updateWeek3Rosters", "fail", () =>
         editWeek3.updateWeek3Rosters([])
     ),
@@ -252,14 +266,14 @@ const cases: SmokeCase[] = [
         evaluatePlayers.saveEvaluations([])
     ),
     c("googleMembership.getGoogleMembershipUsers", "fail", () =>
-        googleMembership.getGoogleMembershipUsers()
+        googleMembershipData.getGoogleMembershipUsers()
     ),
     c("googleMembership.updateGoogleMembership", "fail", () =>
         googleMembership.updateGoogleMembership("u", {} as never)
     ),
     // homework-status
     c("homeworkStatus.getHomeworkStatusData", "fail", () =>
-        homeworkStatus.getHomeworkStatusData()
+        homeworkStatusData.getHomeworkStatusData()
     ),
     c("homeworkStatus.getRatePlayersDetail", "fail", () =>
         homeworkStatus.getRatePlayersDetail("u", 1)
@@ -309,9 +323,11 @@ const cases: SmokeCase[] = [
         myAvailability.updateRefAvailability([])
     ),
     // next-match
-    c("nextMatch.getNextMatch", "null", () => nextMatch.getNextMatch("u", 1)),
+    c("nextMatch.getNextMatch", "null", () =>
+        nextMatchData.getNextMatch("u", 1)
+    ),
     c("nextMatch.getPlayoffNextMatches", "null", () =>
-        nextMatch.getPlayoffNextMatches("u", 1)
+        nextMatchData.getPlayoffNextMatches("u", 1)
     ),
     // player-lookup
     c("playerLookup.getPlayersForLookup", "fail", () =>
@@ -324,7 +340,7 @@ const cases: SmokeCase[] = [
         playerLookup.getPlayerSubHistory("u")
     ),
     c("playerLookupSignups.getSignedUpPlayers", "fail", () =>
-        playerLookupSignups.getSignedUpPlayers()
+        playerLookupSignupsData.getSignedUpPlayers()
     ),
     c("playerLookupSignups.getPlayerDetailsForSignups", "fail", () =>
         playerLookupSignups.getPlayerDetailsForSignups("u")
@@ -332,7 +348,7 @@ const cases: SmokeCase[] = [
     // playoffs / potential-captains
     c("playoffs.getPlayoffData", "fail", () => playoffs.getPlayoffData(1)),
     c("potentialCaptains.getPotentialCaptainsData", "fail", () =>
-        potentialCaptains.getPotentialCaptainsData()
+        potentialCaptainsData.getPotentialCaptainsData()
     ),
     // rate-player
     c("ratePlayer.getRatePlayerData", "fail", () =>
@@ -361,9 +377,9 @@ const cases: SmokeCase[] = [
         reviewPairs.completeUnmatchedPair("a", "b")
     ),
     // rosters / schedules
-    c("rosters.getRosterData", "fail", () => rosters.getRosterData(1)),
+    c("rosters.getRosterData", "fail", () => rostersData.getRosterData(1)),
     c("scheduleRefs.getScheduleRefsData", "fail", () =>
-        scheduleRefs.getScheduleRefsData()
+        scheduleRefsData.getScheduleRefsData()
     ),
     c("scheduleRefs.getMatchesAndRefsForDate", "fail", () =>
         scheduleRefs.getMatchesAndRefsForDate("2026-01-01")
@@ -378,7 +394,9 @@ const cases: SmokeCase[] = [
         seasonSchedule.getCurrentSeasonScheduleData(1)
     ),
     // settings
-    c("settings.getAccountProfile", "fail", () => settings.getAccountProfile()),
+    c("settings.getAccountProfile", "fail", () =>
+        settingsData.getAccountProfile()
+    ),
     c("settings.updateAccountProfile", "fail", () =>
         settings.updateAccountProfile({} as never)
     ),
@@ -429,13 +447,13 @@ const cases: SmokeCase[] = [
         tournamentOverview.withdrawTournamentTeam(1)
     ),
     c("tournamentOverview.getTournamentOverview", "fail", () =>
-        tournamentOverview.getTournamentOverview()
+        tournamentOverviewData.getTournamentOverview()
     ),
     c("tournamentPoolPlay.getTournamentPoolPlay", "fail", () =>
         tournamentPoolPlayData.getTournamentPoolPlay(1)
     ),
     c("tournamentPlayoffs.getTournamentPlayoffs", "fail", () =>
-        tournamentPlayoffs.getTournamentPlayoffs(1)
+        tournamentPlayoffsData.getTournamentPlayoffs(1)
     ),
     c("tournamentRosters.getTournamentRosters", "fail", () =>
         tournamentRosters.getTournamentRosters(1)
@@ -457,7 +475,9 @@ const cases: SmokeCase[] = [
     c("viewSignups.getSignupsCsvData", "fail", () =>
         viewSignups.getSignupsCsvData()
     ),
-    c("viewSignups.getSignupsData", "fail", () => viewSignups.getSignupsData()),
+    c("viewSignups.getSignupsData", "fail", () =>
+        viewSignupsData.getSignupsData()
+    ),
     c("viewSignups.getPlayerDetailsPublic", "fail", () =>
         viewSignups.getPlayerDetailsPublic("u")
     ),
@@ -490,7 +510,7 @@ const cases: SmokeCase[] = [
         volleyballProfile.updateVolleyballProfile({} as never)
     ),
     c("week2Homework.getWeek2HomeworkData", "fail", () =>
-        week2Homework.getWeek2HomeworkData()
+        week2HomeworkData.getWeek2HomeworkData()
     ),
     c("week2Homework.submitWeek2Homework", "fail", () =>
         week2Homework.submitWeek2Homework({} as never)

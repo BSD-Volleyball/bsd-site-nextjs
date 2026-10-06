@@ -3,7 +3,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { HomeworkStatusView } from "./homework-status-view"
-import { getHomeworkStatusData } from "./actions"
+import { getHomeworkStatusData } from "./data"
 
 import type { Metadata } from "next"
 

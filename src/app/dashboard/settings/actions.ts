@@ -17,28 +17,6 @@ export interface AccountProfileData {
     pronouns: string | null
 }
 
-export const getAccountProfile = withAction(
-    async (): Promise<ActionResult<AccountProfileData | null>> => {
-        const session = await requireSession()
-
-        const [user] = await db
-            .select({
-                first_name: users.first_name,
-                last_name: users.last_name,
-                preferred_name: users.preferred_name,
-                email: users.email,
-                phone: users.phone,
-                emergency_contact: users.emergency_contact,
-                pronouns: users.pronouns
-            })
-            .from(users)
-            .where(eq(users.id, session.user.id))
-            .limit(1)
-
-        return ok(user || null)
-    }
-)
-
 export const updateAccountProfile = withAction(
     async (data: AccountProfileData): Promise<ActionResult> => {
         const session = await requireSession()

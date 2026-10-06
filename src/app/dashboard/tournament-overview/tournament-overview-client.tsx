@@ -17,11 +17,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
 import { AdminPlayerDetailPopup } from "@/components/player-detail/admin-player-detail-popup"
-import {
-    withdrawTournamentTeam,
-    type OverviewTeam,
-    type TournamentOverviewData
-} from "./actions"
+import { withdrawTournamentTeam } from "./actions"
+import type { OverviewTeam, TournamentOverviewData } from "./data"
 
 interface Props {
     data: TournamentOverviewData

@@ -5,7 +5,7 @@ import type {
     CaptainAttritionData,
     CaptainAttritionAvgData,
     GenderRatio
-} from "./actions"
+} from "./data"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     BarChart,

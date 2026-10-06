@@ -18,7 +18,6 @@ import {
     requirePositiveInt,
     withAction
 } from "@/next/action-helpers"
-import { isAdminOrDirectorBySession } from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 import { eq, inArray } from "drizzle-orm"
 import {
@@ -26,28 +25,6 @@ import {
     type InsuranceReport,
     seasonLabel
 } from "./report-logic"
-
-/**
- * Distinct calendar years that have any season or tournament data, newest
- * first. The current year is always included so the report defaults to a real
- * option even before the season/tournament rows for it exist.
- */
-export async function getInsuranceReportYears(): Promise<number[]> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return []
-
-    const [seasonYears, tournamentYears] = await Promise.all([
-        db.selectDistinct({ year: seasons.year }).from(seasons),
-        db.selectDistinct({ year: tournaments.year }).from(tournaments)
-    ])
-
-    const set = new Set<number>()
-    for (const row of seasonYears) set.add(row.year)
-    for (const row of tournamentYears) set.add(row.year)
-    set.add(new Date().getFullYear())
-
-    return Array.from(set).sort((a, b) => b - a)
-}
 
 /**
  * Insurance headcount for a calendar year: distinct participants (season

@@ -59,7 +59,7 @@ import {
     getPlayoffNextMatches,
     type NextMatch,
     type PlayoffNextMatchData
-} from "./next-match-actions"
+} from "./next-match-data"
 import { PlayoffNextMatchCard } from "@/components/dashboard/playoff-next-match-card"
 import { SurveyCard } from "@/components/dashboard/survey-card"
 import { listSurveysForUser } from "@/lib/surveys/respondent"

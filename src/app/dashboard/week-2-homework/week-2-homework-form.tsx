@@ -28,12 +28,8 @@ import {
     usePlayerDetailModal,
     PlayerDetailPopup
 } from "@/components/player-detail"
-import {
-    submitWeek2Homework,
-    type Week2Player,
-    type ExistingSubmission,
-    type SeasonInfo
-} from "./actions"
+import { submitWeek2Homework } from "./actions"
+import type { Week2Player, ExistingSubmission, SeasonInfo } from "./data"
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 
 interface Week2HomeworkFormProps {

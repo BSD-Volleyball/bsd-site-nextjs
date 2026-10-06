@@ -28,13 +28,13 @@ import {
     usePlayerDetailModal,
     PlayerDetailPopup
 } from "@/components/player-detail"
-import {
-    submitCoachWeek2Homework,
-    type Week2Player,
-    type CoachExistingSubmission,
-    type CoachTeamRoster,
-    type SeasonInfo
-} from "./actions"
+import { submitCoachWeek2Homework } from "./actions"
+import type {
+    Week2Player,
+    CoachExistingSubmission,
+    CoachTeamRoster,
+    SeasonInfo
+} from "./data"
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 
 interface CoachWeek2HomeworkFormProps {

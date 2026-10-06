@@ -36,7 +36,7 @@ import {
 } from "@/lib/email-template-variables"
 import type { SeasonConfig } from "@/lib/season-types"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
-import type { DivisionCommissioner } from "./actions"
+import type { DivisionCommissioner } from "./data"
 
 interface PotentialCaptain {
     id: string

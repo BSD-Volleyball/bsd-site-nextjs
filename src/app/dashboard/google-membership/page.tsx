@@ -1,7 +1,7 @@
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
-import { getGoogleMembershipUsers } from "./actions"
+import { getGoogleMembershipUsers } from "./data"
 import { GoogleMembershipTable } from "./google-membership-table"
 import type { Metadata } from "next"
 

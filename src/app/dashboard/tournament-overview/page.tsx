@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
-import { getTournamentOverview } from "./actions"
+import { getTournamentOverview } from "./data"
 import { TournamentOverviewClient } from "./tournament-overview-client"
 
 export const metadata: Metadata = {

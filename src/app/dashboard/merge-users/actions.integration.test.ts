@@ -37,11 +37,8 @@ import {
     addToWaitlist
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import {
-    getMergeCandidateDetails,
-    getMergeableUsers,
-    mergeUsers
-} from "./actions"
+import { getMergeCandidateDetails, mergeUsers } from "./actions"
+import { getMergeableUsers } from "./data"
 
 async function userExists(id: string): Promise<boolean> {
     const rows = await db.select().from(users).where(eq(users.id, id))

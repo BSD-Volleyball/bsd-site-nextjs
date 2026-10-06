@@ -1,7 +1,7 @@
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
-import { getWeek2HomeworkData } from "./actions"
+import { getWeek2HomeworkData } from "./data"
 import { Week2HomeworkForm } from "./week-2-homework-form"
 import { CoachWeek2HomeworkForm } from "./coach-week-2-homework-form"
 import type { Metadata } from "next"

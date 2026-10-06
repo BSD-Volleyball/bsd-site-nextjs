@@ -2,7 +2,7 @@ import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 
 import type { Metadata } from "next"
-import { getCurrentSeasonPhaseData } from "./actions"
+import { getCurrentSeasonPhaseData } from "./data"
 import { SeasonPhaseControl } from "./season-phase-control"
 import { CreateSeasonCard } from "./create-season-card"
 import { PHASE_CONFIG } from "@/lib/season-phases"

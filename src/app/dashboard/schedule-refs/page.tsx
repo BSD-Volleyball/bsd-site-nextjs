@@ -1,7 +1,8 @@
 import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
-import { getScheduleRefsData, getMatchesAndRefsForDate } from "./actions"
+import { getMatchesAndRefsForDate } from "./actions"
+import { getScheduleRefsData } from "./data"
 import { ScheduleRefsClient } from "./schedule-refs-client"
 import type { Metadata } from "next"
 

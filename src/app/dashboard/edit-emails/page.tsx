@@ -2,7 +2,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { EditEmailsForm } from "./edit-emails-form"
-import { getEmailTemplates } from "./actions"
+import { getEmailTemplates } from "./data"
 
 import type { Metadata } from "next"
 

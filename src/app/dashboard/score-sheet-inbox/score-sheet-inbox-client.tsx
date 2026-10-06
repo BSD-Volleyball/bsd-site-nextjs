@@ -17,7 +17,7 @@ import { compressImageForUpload } from "@/lib/image-compression"
 import { SCORE_SHEET_COMPRESSION } from "@/lib/scoresheets/capture"
 import { cn } from "@/lib/utils"
 
-import type { MatchDateOption } from "../enter-scores/actions"
+import type { MatchDateOption } from "../enter-scores/data"
 import {
     createSheetUpload,
     deleteUploadedSheet,

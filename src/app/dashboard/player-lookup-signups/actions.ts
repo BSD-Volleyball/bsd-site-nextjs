@@ -34,65 +34,6 @@ import {
     type SeasonHistoryEntry
 } from "@/lib/player-season-history"
 
-export interface PlayerListItem {
-    id: string
-    old_id: number | null
-    first_name: string
-    last_name: string
-    preferred_name: string | null
-}
-
-export interface SeasonInfo {
-    id: number
-    year: number
-    name: string
-}
-
-export const getSignedUpPlayers = withAction(
-    async (): Promise<
-        ActionResult<{ players: PlayerListItem[]; allSeasons: SeasonInfo[] }>
-    > => {
-        await requireCaptainAccess()
-
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return fail("No current season found.")
-        }
-
-        const signupRows = await db
-            .select({
-                id: users.id,
-                old_id: users.old_id,
-                first_name: users.first_name,
-                last_name: users.last_name,
-                preferred_name: users.preferred_name
-            })
-            .from(signups)
-            .innerJoin(users, eq(signups.player, users.id))
-            .where(eq(signups.season, config.seasonId))
-            .orderBy(users.last_name, users.first_name)
-
-        const allSeasonRows = await db
-            .select({
-                id: seasons.id,
-                year: seasons.year,
-                name: seasons.season
-            })
-            .from(seasons)
-            .orderBy(desc(seasons.id))
-            .limit(11)
-
-        return ok({
-            players: signupRows,
-            allSeasons: allSeasonRows.map((s) => ({
-                id: s.id,
-                year: s.year,
-                name: s.name
-            }))
-        })
-    }
-)
-
 export interface PlayerDetails {
     id: string
     first_name: string

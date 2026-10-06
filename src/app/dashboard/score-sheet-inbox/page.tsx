@@ -8,7 +8,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { hasPermissionBySession } from "@/next/session"
 
-import { getMatchDatesForSeason } from "../enter-scores/actions"
+import { getMatchDatesForSeason } from "../enter-scores/data"
 import { getSheetInbox } from "./actions"
 import { ScoreSheetInboxClient } from "./score-sheet-inbox-client"
 

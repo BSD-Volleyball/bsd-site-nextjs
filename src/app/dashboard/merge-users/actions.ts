@@ -13,7 +13,7 @@ import {
     userRoles,
     users
 } from "@/database/schema"
-import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import type { ActionResult } from "@/next/action-helpers"
 import {
@@ -24,7 +24,6 @@ import {
     withAction
 } from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
-import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import type {
     MergeChoice,
     MergeDefaultsContext,
@@ -39,17 +38,8 @@ import {
     resolveDefaultSelections
 } from "@/lib/merge-user-fields"
 import { mergeUserRecords } from "@/lib/merge-users"
-import { getSessionUser } from "@/next/session"
 import { isAdminOrDirector } from "@/lib/rbac"
 import { formatDisplayName } from "@/lib/utils"
-
-export interface UserOption {
-    id: string
-    name: string
-    email: string
-    phone: string | null
-    createdAt: Date
-}
 
 /** What each account brings to the merge, beyond the field values themselves. */
 export interface MergeAccountActivity {
@@ -111,48 +101,6 @@ async function sharesATeam(aId: string, bId: string): Promise<boolean> {
         )
         .limit(1)
     return rows.length > 0
-}
-
-/**
- * Every account, for both pickers. The two sides are symmetric -- there is no
- * "old" and "new" -- so one list serves both.
- *
- * The authorization guard is inlined in the exported action below rather than
- * living here, so that it is enforced at the action boundary as AGENTS.md
- * requires and so scripts/security/authz-regression-check.js can see it. A
- * guard behind a delegate is invisible to that check, which is the point of
- * the check.
- */
-async function listMergeableUsers(): Promise<UserOption[]> {
-    const results = await db
-        .select({
-            id: users.id,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            email: users.email,
-            phone: users.phone,
-            createdAt: users.createdAt
-        })
-        .from(users)
-        .where(ne(users.id, GHOST_CAPTAIN_ID))
-        .orderBy(users.last_name, users.first_name)
-
-    return results.map((u) => ({
-        id: u.id,
-        name: formatDisplayName(u.firstName, u.lastName, u.preferredName),
-        email: u.email,
-        phone: u.phone,
-        createdAt: u.createdAt
-    }))
-}
-
-export async function getMergeableUsers(): Promise<UserOption[]> {
-    const user = await getSessionUser()
-    if (!user || !(await isAdminOrDirector(user.id))) {
-        return []
-    }
-    return listMergeableUsers()
 }
 
 type UserRow = typeof users.$inferSelect
@@ -246,7 +194,7 @@ async function snapshot(row: UserRow): Promise<MergeAccountSnapshot> {
  * choices an admin would usually make.
  *
  * Authorization is inline rather than delegated -- see the note above
- * listMergeableUsers.
+ * listMergeableUsers in data.ts.
  */
 export const getMergeCandidateDetails = withAction(
     async (
