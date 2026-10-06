@@ -1,8 +1,9 @@
 "use client"
 
-import { useRef, useState, useTransition } from "react"
+import { useId, useRef, useState, useTransition } from "react"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { UserCombobox } from "@/components/user-combobox"
 import {
     createPlayerPictureUpload,
@@ -160,6 +161,7 @@ function userToFormData(user: UserDetails): FormData {
 }
 
 export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
+    const id = useId()
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [originalId, setOriginalId] = useState<string | null>(null)
@@ -169,8 +171,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
     const [seasonPlayers, setSeasonPlayers] = useState<
         { id: string; name: string }[]
     >([])
-    const [isPending, startTransition] = useTransition()
-    const [isSignupPending, startSignupTransition] = useTransition()
+    const { run: saveUser, pending: isPending } = useAction(updateUser, {
+        refresh: false
+    })
+    const { run: saveSignup, pending: isSignupPending } = useAction(
+        updateSignup,
+        { refresh: false }
+    )
     const [isPictureUploadPending, startPictureUploadTransition] =
         useTransition()
     const [pictureFile, setPictureFile] = useState<File | null>(null)
@@ -190,24 +197,31 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         if (!userId) return
 
         setLoading(true)
-        const [userResult, signupResult, playersResult] = await Promise.all([
-            getUserDetails(userId),
-            getSignupForCurrentSeason(userId),
-            getCurrentSeasonPlayers()
-        ])
-        setLoading(false)
+        try {
+            const [userResult, signupResult, playersResult] = await Promise.all(
+                [
+                    getUserDetails(userId),
+                    getSignupForCurrentSeason(userId),
+                    getCurrentSeasonPlayers()
+                ]
+            )
 
-        setSeasonPlayers(playersResult.status ? playersResult.data : [])
+            setSeasonPlayers(playersResult.status ? playersResult.data : [])
 
-        if (userResult.status) {
-            setFormData(userToFormData(userResult.data))
-            setOriginalId(userResult.data.id)
-        } else {
-            toast.error(userResult.message || "Failed to load user.")
-        }
+            if (userResult.status) {
+                setFormData(userToFormData(userResult.data))
+                setOriginalId(userResult.data.id)
+            } else {
+                toast.error(userResult.message || "Failed to load user.")
+            }
 
-        if (signupResult.status && signupResult.data) {
-            setSignupData(signupToFormData(signupResult.data))
+            if (signupResult.status && signupResult.data) {
+                setSignupData(signupToFormData(signupResult.data))
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -239,39 +253,31 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
     const handleSave = () => {
         if (!formData || !originalId) return
 
-        startTransition(async () => {
-            const result = await updateUser(originalId, {
-                name: formData.name || null,
-                first_name: formData.first_name,
-                last_name: formData.last_name,
-                preferred_name: formData.preferred_name || null,
-                email: formData.email,
-                emailVerified: formData.emailVerified,
-                old_id: formData.old_id ? parseInt(formData.old_id, 10) : 0,
-                picture: formData.picture || null,
-                phone: formData.phone || null,
-                experience: formData.experience || null,
-                assessment: formData.assessment || null,
-                height: formData.height ? parseInt(formData.height, 10) : null,
-                skill_setter: formData.skill_setter,
-                skill_hitter: formData.skill_hitter,
-                skill_passer: formData.skill_passer,
-                skill_other: formData.skill_other,
-                emergency_contact: formData.emergency_contact || null,
-                referred_by: formData.referred_by || null,
-                pronouns: formData.pronouns || null,
-                male: formData.male,
-                onboarding_completed: formData.onboarding_completed,
-                seasons_list: formData.seasons_list || "false",
-                notification_list: formData.notification_list || "false",
-                captain_eligible: formData.captain_eligible
-            })
-
-            if (result.status) {
-                toast.success(result.message)
-            } else {
-                toast.error(result.message)
-            }
+        void saveUser(originalId, {
+            name: formData.name || null,
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            preferred_name: formData.preferred_name || null,
+            email: formData.email,
+            emailVerified: formData.emailVerified,
+            old_id: formData.old_id ? parseInt(formData.old_id, 10) : 0,
+            picture: formData.picture || null,
+            phone: formData.phone || null,
+            experience: formData.experience || null,
+            assessment: formData.assessment || null,
+            height: formData.height ? parseInt(formData.height, 10) : null,
+            skill_setter: formData.skill_setter,
+            skill_hitter: formData.skill_hitter,
+            skill_passer: formData.skill_passer,
+            skill_other: formData.skill_other,
+            emergency_contact: formData.emergency_contact || null,
+            referred_by: formData.referred_by || null,
+            pronouns: formData.pronouns || null,
+            male: formData.male,
+            onboarding_completed: formData.onboarding_completed,
+            seasons_list: formData.seasons_list || "false",
+            notification_list: formData.notification_list || "false",
+            captain_eligible: formData.captain_eligible
         })
     }
 
@@ -298,66 +304,72 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         const fileToUpload = pictureFile
 
         startPictureUploadTransition(async () => {
-            let processedImage: { blob: Blob }
             try {
-                processedImage = await compressImageForUpload(fileToUpload)
-            } catch (error) {
-                console.error("Image compression failed:", error)
-                toast.error(
-                    "Could not process that image. Please try another photo."
+                let processedImage: { blob: Blob }
+                try {
+                    processedImage = await compressImageForUpload(fileToUpload)
+                } catch (error) {
+                    console.error("Image compression failed:", error)
+                    toast.error(
+                        "Could not process that image. Please try another photo."
+                    )
+                    return
+                }
+
+                const uploadStart = await createPlayerPictureUpload(
+                    originalId,
+                    processedImage.blob.size
                 )
-                return
+                if (!uploadStart.status) {
+                    toast.error(
+                        uploadStart.message || "Failed to start upload."
+                    )
+                    return
+                }
+                const { uploadUrl, pictureFilename } = uploadStart.data
+
+                const uploadResponse = await fetch(uploadUrl, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "image/jpeg",
+                        "Content-Length": String(processedImage.blob.size)
+                    },
+                    body: processedImage.blob
+                })
+
+                if (!uploadResponse.ok) {
+                    toast.error("Upload to storage failed. Please try again.")
+                    return
+                }
+
+                const finalizeResult = await finalizePlayerPictureUpload(
+                    originalId,
+                    pictureFilename
+                )
+
+                if (!finalizeResult.status) {
+                    toast.error(finalizeResult.message)
+                    return
+                }
+
+                setFormData((current) =>
+                    current
+                        ? {
+                              ...current,
+                              picture:
+                                  finalizeResult.data.picturePath ||
+                                  `/playerpics/${pictureFilename}`
+                          }
+                        : current
+                )
+                setPictureFile(null)
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = ""
+                }
+                toast.success(finalizeResult.message)
+            } catch {
+                toast.error("Something went wrong. Please try again.")
             }
-
-            const uploadStart = await createPlayerPictureUpload(
-                originalId,
-                processedImage.blob.size
-            )
-            if (!uploadStart.status) {
-                toast.error(uploadStart.message || "Failed to start upload.")
-                return
-            }
-            const { uploadUrl, pictureFilename } = uploadStart.data
-
-            const uploadResponse = await fetch(uploadUrl, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "image/jpeg",
-                    "Content-Length": String(processedImage.blob.size)
-                },
-                body: processedImage.blob
-            })
-
-            if (!uploadResponse.ok) {
-                toast.error("Upload to storage failed. Please try again.")
-                return
-            }
-
-            const finalizeResult = await finalizePlayerPictureUpload(
-                originalId,
-                pictureFilename
-            )
-
-            if (!finalizeResult.status) {
-                toast.error(finalizeResult.message)
-                return
-            }
-
-            setFormData((current) =>
-                current
-                    ? {
-                          ...current,
-                          picture:
-                              finalizeResult.data.picturePath ||
-                              `/playerpics/${pictureFilename}`
-                      }
-                    : current
-            )
-            setPictureFile(null)
-            if (fileInputRef.current) {
-                fileInputRef.current.value = ""
-            }
-            toast.success(finalizeResult.message)
         })
     }
 
@@ -380,23 +392,15 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
     const handleSignupSave = () => {
         if (!signupData) return
 
-        startSignupTransition(async () => {
-            const result = await updateSignup(signupData.id, {
-                age: signupData.age || null,
-                captain: signupData.captain || null,
-                pair: signupData.pair,
-                pair_pick: signupData.pair_pick || null,
-                pair_reason: signupData.pair_reason || null,
-                ref_interest: signupData.ref_interest,
-                tryout_help: signupData.tryout_help,
-                amount_paid: signupData.amount_paid || null
-            })
-
-            if (result.status) {
-                toast.success(result.message)
-            } else {
-                toast.error(result.message)
-            }
+        void saveSignup(signupData.id, {
+            age: signupData.age || null,
+            captain: signupData.captain || null,
+            pair: signupData.pair,
+            pair_pick: signupData.pair_pick || null,
+            pair_reason: signupData.pair_reason || null,
+            ref_interest: signupData.ref_interest,
+            tryout_help: signupData.tryout_help,
+            amount_paid: signupData.amount_paid || null
         })
     }
 
@@ -501,11 +505,11 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                             </div>
 
                             <div className="w-full max-w-md space-y-2">
-                                <Label htmlFor="player_picture_upload">
+                                <Label htmlFor={`${id}-player_picture_upload`}>
                                     Upload image (auto-compressed)
                                 </Label>
                                 <Input
-                                    id="player_picture_upload"
+                                    id={`${id}-player_picture_upload`}
                                     ref={fileInputRef}
                                     type="file"
                                     accept="image/*"
@@ -537,13 +541,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                             return (
                                 <div key={field.key}>
                                     <Label
-                                        htmlFor={field.key}
+                                        htmlFor={`${id}-${field.key}`}
                                         className="mb-1 block"
                                     >
                                         {field.label}
                                     </Label>
                                     <Input
-                                        id={field.key}
+                                        id={`${id}-${field.key}`}
                                         value={
                                             (formData[field.key] as string) ??
                                             ""
@@ -563,13 +567,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         {intFields.map((field) => (
                             <div key={field.key}>
                                 <Label
-                                    htmlFor={field.key}
+                                    htmlFor={`${id}-${field.key}`}
                                     className="mb-1 block"
                                 >
                                     {field.label}
                                 </Label>
                                 <Input
-                                    id={field.key}
+                                    id={`${id}-${field.key}`}
                                     type="number"
                                     value={
                                         (formData[field.key] as string) ?? ""
@@ -589,7 +593,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         {membershipFields.map((field) => (
                             <div key={field.key}>
                                 <Label
-                                    htmlFor={field.key}
+                                    htmlFor={`${id}-${field.key}`}
                                     className="mb-1 block"
                                 >
                                     {field.label}
@@ -602,7 +606,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                         handleTextChange(field.key, value)
                                     }
                                 >
-                                    <SelectTrigger id={field.key}>
+                                    <SelectTrigger id={`${id}-${field.key}`}>
                                         <SelectValue placeholder="Select status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -632,7 +636,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                     className="flex items-center gap-3"
                                 >
                                     <Switch
-                                        id={field.key}
+                                        id={`${id}-${field.key}`}
                                         checked={formData[field.key] as boolean}
                                         onCheckedChange={(checked) =>
                                             handleBooleanChange(
@@ -641,7 +645,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                             )
                                         }
                                     />
-                                    <Label htmlFor={field.key}>
+                                    <Label htmlFor={`${id}-${field.key}`}>
                                         {field.label}
                                     </Label>
                                 </div>
@@ -674,11 +678,14 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <Label htmlFor="signup_age" className="mb-1 block">
+                            <Label
+                                htmlFor={`${id}-signup_age`}
+                                className="mb-1 block"
+                            >
                                 Age
                             </Label>
                             <Input
-                                id="signup_age"
+                                id={`${id}-signup_age`}
                                 value={signupData.age}
                                 onChange={(e) =>
                                     handleSignupTextChange(
@@ -690,7 +697,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         </div>
                         <div>
                             <Label
-                                htmlFor="signup_captain"
+                                htmlFor={`${id}-signup_captain`}
                                 className="mb-1 block"
                             >
                                 Captain
@@ -701,7 +708,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                     handleSignupTextChange("captain", value)
                                 }
                             >
-                                <SelectTrigger id="signup_captain">
+                                <SelectTrigger id={`${id}-signup_captain`}>
                                     <SelectValue placeholder="Select..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -715,7 +722,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         </div>
                         <div>
                             <Label
-                                htmlFor="signup_pair_pick"
+                                htmlFor={`${id}-signup_pair_pick`}
                                 className="mb-1 block"
                             >
                                 Pair Pick
@@ -734,13 +741,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         </div>
                         <div>
                             <Label
-                                htmlFor="signup_pair_reason"
+                                htmlFor={`${id}-signup_pair_reason`}
                                 className="mb-1 block"
                             >
                                 Pair Reason
                             </Label>
                             <Input
-                                id="signup_pair_reason"
+                                id={`${id}-signup_pair_reason`}
                                 value={signupData.pair_reason}
                                 onChange={(e) =>
                                     handleSignupTextChange(
@@ -752,13 +759,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         </div>
                         <div>
                             <Label
-                                htmlFor="signup_amount_paid"
+                                htmlFor={`${id}-signup_amount_paid`}
                                 className="mb-1 block"
                             >
                                 Amount Paid
                             </Label>
                             <Input
-                                id="signup_amount_paid"
+                                id={`${id}-signup_amount_paid`}
                                 value={signupData.amount_paid}
                                 onChange={(e) =>
                                     handleSignupTextChange(
@@ -773,17 +780,19 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div className="flex items-center gap-3">
                             <Switch
-                                id="signup_pair"
+                                id={`${id}-signup_pair`}
                                 checked={signupData.pair}
                                 onCheckedChange={(checked) =>
                                     handleSignupBooleanChange("pair", checked)
                                 }
                             />
-                            <Label htmlFor="signup_pair">Wants Pair</Label>
+                            <Label htmlFor={`${id}-signup_pair`}>
+                                Wants Pair
+                            </Label>
                         </div>
                         <div className="flex items-center gap-3">
                             <Switch
-                                id="signup_ref_interest"
+                                id={`${id}-signup_ref_interest`}
                                 checked={signupData.ref_interest}
                                 onCheckedChange={(checked) =>
                                     handleSignupBooleanChange(
@@ -792,13 +801,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                     )
                                 }
                             />
-                            <Label htmlFor="signup_ref_interest">
+                            <Label htmlFor={`${id}-signup_ref_interest`}>
                                 Wants to Ref
                             </Label>
                         </div>
                         <div className="flex items-center gap-3">
                             <Switch
-                                id="signup_tryout_help"
+                                id={`${id}-signup_tryout_help`}
                                 checked={signupData.tryout_help}
                                 onCheckedChange={(checked) =>
                                     handleSignupBooleanChange(
@@ -807,7 +816,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                     )
                                 }
                             />
-                            <Label htmlFor="signup_tryout_help">
+                            <Label htmlFor={`${id}-signup_tryout_help`}>
                                 Will Help Run Tryouts
                             </Label>
                         </div>

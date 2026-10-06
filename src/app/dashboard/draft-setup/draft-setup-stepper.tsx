@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useId } from "react"
 import { RiCheckLine, RiLockLine, RiLockUnlockLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import type { DraftSetupStatus, DraftSetupStepState } from "@/lib/draft-setup"
@@ -170,17 +171,15 @@ export function DraftSetupDivisionPicker({
     divisions: { id: number; name: string }[]
 }) {
     const router = useRouter()
+    const selectId = useId()
     if (divisions.length <= 1) return null
     return (
         <div className="flex items-center gap-2">
-            <label
-                htmlFor="draft-setup-division"
-                className="font-medium text-sm"
-            >
+            <label htmlFor={selectId} className="font-medium text-sm">
                 Division
             </label>
             <select
-                id="draft-setup-division"
+                id={selectId}
                 value={divisionId}
                 onChange={(e) =>
                     router.push(

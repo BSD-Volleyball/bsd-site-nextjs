@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useId, useState } from "react"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -29,27 +28,21 @@ export function TournamentWaitlistButton({
     waiver,
     divisions
 }: Props) {
-    const router = useRouter()
+    const id = useId()
     const [open, setOpen] = useState(false)
     const [agreed, setAgreed] = useState(false)
     const [preferredDivisionId, setPreferredDivisionId] = useState<number>(0)
-    const [busy, setBusy] = useState(false)
+    const { run, pending: busy } = useAction(expressTournamentInterest, {
+        success: "Thanks for signing up to play!",
+        onSuccess: () => setOpen(false)
+    })
 
-    async function handleSubmit() {
-        setBusy(true)
-        const result = await expressTournamentInterest(
+    function handleSubmit() {
+        void run(
             waiver.id,
             agreed,
             preferredDivisionId > 0 ? preferredDivisionId : null
         )
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success("Thanks for signing up to play!")
-        setOpen(false)
-        router.refresh()
     }
 
     return (
@@ -74,7 +67,7 @@ export function TournamentWaitlistButton({
                     {divisions.length > 0 && (
                         <div className="space-y-2 pt-2">
                             <Label
-                                htmlFor="t-wl-div"
+                                htmlFor={`${id}-division`}
                                 className="font-medium text-sm"
                             >
                                 Preferred Division{" "}
@@ -83,7 +76,7 @@ export function TournamentWaitlistButton({
                                 </span>
                             </Label>
                             <select
-                                id="t-wl-div"
+                                id={`${id}-division`}
                                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                                 value={preferredDivisionId}
                                 onChange={(e) =>
@@ -109,12 +102,12 @@ export function TournamentWaitlistButton({
                     <WaiverContent content={waiver.content} />
                     <div className="flex items-start gap-2 pt-2">
                         <Checkbox
-                            id="t-wl-check"
+                            id={`${id}-agree`}
                             checked={agreed}
                             onCheckedChange={(c) => setAgreed(c === true)}
                         />
                         <Label
-                            htmlFor="t-wl-check"
+                            htmlFor={`${id}-agree`}
                             className="font-normal text-sm"
                         >
                             I have read and agree to the waiver.

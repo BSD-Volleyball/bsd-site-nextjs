@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, useId, useMemo } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import {
     Select,
@@ -160,7 +160,7 @@ export function CommissionersForm({
     divisions,
     initialSeasonId
 }: CommissionersFormProps) {
-    const router = useRouter()
+    const id = useId()
     const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(
         initialSeasonId
     )
@@ -174,35 +174,39 @@ export function CommissionersForm({
         >
     >({})
     const [isLoading, setIsLoading] = useState(false)
-    const [isSaving, setIsSaving] = useState(false)
+    const { run: save, pending: isSaving } = useAction(saveCommissioners)
 
     const loadCommissioners = useCallback(async (seasonId: number) => {
         setIsLoading(true)
 
-        const result = await getCommissionersForSeason(seasonId)
+        try {
+            const result = await getCommissionersForSeason(seasonId)
 
-        if (result.status) {
-            const assignmentsMap: Record<
-                number,
-                {
-                    commissioner1: string | null
-                    commissioner2: string | null
-                }
-            > = {}
+            if (result.status) {
+                const assignmentsMap: Record<
+                    number,
+                    {
+                        commissioner1: string | null
+                        commissioner2: string | null
+                    }
+                > = {}
 
-            for (const assignment of result.data) {
-                assignmentsMap[assignment.divisionId] = {
-                    commissioner1: assignment.commissioner1,
-                    commissioner2: assignment.commissioner2
+                for (const assignment of result.data) {
+                    assignmentsMap[assignment.divisionId] = {
+                        commissioner1: assignment.commissioner1,
+                        commissioner2: assignment.commissioner2
+                    }
                 }
+
+                setAssignments(assignmentsMap)
+            } else {
+                toast.error(result.message || "Failed to load commissioners.")
             }
-
-            setAssignments(assignmentsMap)
-        } else {
-            toast.error(result.message || "Failed to load commissioners.")
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setIsLoading(false)
         }
-
-        setIsLoading(false)
     }, [])
 
     // Load commissioners when season changes
@@ -212,15 +216,13 @@ export function CommissionersForm({
         }
     }, [selectedSeasonId, loadCommissioners])
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
         if (!selectedSeasonId) {
             toast.error("Please select a season.")
             return
         }
-
-        setIsSaving(true)
 
         const assignmentsArray = divisions.map((div) => ({
             divisionId: div.id,
@@ -229,19 +231,10 @@ export function CommissionersForm({
             commissioner2: assignments[div.id]?.commissioner2 ?? null
         }))
 
-        const result = await saveCommissioners({
+        void save({
             seasonId: selectedSeasonId,
             assignments: assignmentsArray
         })
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-
-        setIsSaving(false)
     }
 
     function updateCommissioner(
@@ -262,14 +255,14 @@ export function CommissionersForm({
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-                <Label htmlFor="season">Season</Label>
+                <Label htmlFor={`${id}-season`}>Season</Label>
                 <Select
                     value={selectedSeasonId?.toString() ?? ""}
                     onValueChange={(value) =>
                         setSelectedSeasonId(Number.parseInt(value, 10))
                     }
                 >
-                    <SelectTrigger id="season">
+                    <SelectTrigger id={`${id}-season`}>
                         <SelectValue placeholder="Select a season" />
                     </SelectTrigger>
                     <SelectContent>
@@ -317,7 +310,7 @@ export function CommissionersForm({
                                         )
                                     }
                                     label="Commissioner 1"
-                                    id={`${division.id}-comm1`}
+                                    id={`${id}-${division.id}-comm1`}
                                 />
 
                                 <CommissionerSelect
@@ -334,7 +327,7 @@ export function CommissionersForm({
                                         )
                                     }
                                     label="Commissioner 2"
-                                    id={`${division.id}-comm2`}
+                                    id={`${id}-${division.id}-comm2`}
                                 />
                             </CardContent>
                         </Card>

@@ -1,9 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -20,8 +19,7 @@ export function PickTryoutVolunteersClient({
 }: {
     view: PickTryoutVolunteersView
 }) {
-    const router = useRouter()
-    const [busy, setBusy] = useState(false)
+    const { run: toggle, pending: busy } = useAction(setTryoutVolunteer)
     const [picked, setPicked] = useState<string | null>(null)
 
     const volunteerCount =
@@ -43,18 +41,6 @@ export function PickTryoutVolunteersClient({
         () => view.allUsers.filter((u) => !currentVolunteerIds.has(u.id)),
         [view.allUsers, currentVolunteerIds]
     )
-
-    async function toggle(userId: string, enabled: boolean) {
-        setBusy(true)
-        const result = await setTryoutVolunteer(userId, enabled)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success(result.message ?? "Updated.")
-        router.refresh()
-    }
 
     function renderRow(candidate: VolunteerCandidate) {
         return (

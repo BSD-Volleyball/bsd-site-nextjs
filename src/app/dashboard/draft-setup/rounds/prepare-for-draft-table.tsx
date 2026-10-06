@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import type { PrepareForDraftData } from "./actions"
 import { lockDraftRounds, setCaptainRound, setPairDiff } from "./actions"
 import type { DraftHomeworkDetailResult } from "@/app/dashboard/homework-status/actions"
@@ -56,11 +57,16 @@ export function PrepareForDraftTable({
         setHomeworkPopupOpen(true)
         setHomeworkData(null)
         startHomeworkTransition(async () => {
-            const result = await getDraftHomeworkDetail(
-                captainUserId,
-                data.seasonId
-            )
-            setHomeworkData(result)
+            try {
+                const result = await getDraftHomeworkDetail(
+                    captainUserId,
+                    data.seasonId
+                )
+                setHomeworkData(result)
+            } catch {
+                toast.error("Something went wrong. Please try again.")
+                setHomeworkPopupOpen(false)
+            }
         })
     }
 

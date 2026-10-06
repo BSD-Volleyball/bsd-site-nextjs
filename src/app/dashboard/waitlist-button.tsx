@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useId, useState } from "react"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -25,9 +24,8 @@ export function WaitlistButton({
     seasonId,
     activeWaiver
 }: WaitlistButtonProps) {
-    const router = useRouter()
+    const agreeId = useId()
     const [open, setOpen] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
     const [waiverAgreed, setWaiverAgreed] = useState(false)
 
     // Never carry a checked box across openings — each visit to the dialog has
@@ -37,25 +35,13 @@ export function WaitlistButton({
         if (!next) setWaiverAgreed(false)
     }
 
-    const handleSubmit = async () => {
+    const { run, pending: isLoading } = useAction(expressWaitlistInterest, {
+        onSuccess: () => handleOpenChange(false)
+    })
+
+    const handleSubmit = () => {
         if (!activeWaiver) return
-        setIsLoading(true)
-
-        const result = await expressWaitlistInterest(
-            seasonId,
-            activeWaiver.id,
-            waiverAgreed
-        )
-        setIsLoading(false)
-
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-
-        toast.success(result.message)
-        handleOpenChange(false)
-        router.refresh()
+        void run(seasonId, activeWaiver.id, waiverAgreed)
     }
 
     if (!activeWaiver) {
@@ -82,14 +68,14 @@ export function WaitlistButton({
                     <WaiverContent content={activeWaiver.content} />
                     <div className="flex items-start gap-2 pt-2">
                         <Checkbox
-                            id={`waitlist-waiver-agree-${seasonId}`}
+                            id={agreeId}
                             checked={waiverAgreed}
                             onCheckedChange={(
                                 checked: boolean | "indeterminate"
                             ) => setWaiverAgreed(checked === true)}
                         />
                         <Label
-                            htmlFor={`waitlist-waiver-agree-${seasonId}`}
+                            htmlFor={agreeId}
                             className="cursor-pointer font-normal text-sm"
                         >
                             I have read and agree to the waiver.

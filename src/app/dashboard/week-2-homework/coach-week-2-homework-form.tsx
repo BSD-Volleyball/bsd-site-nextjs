@@ -1,14 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useId, useMemo, useState } from "react"
 import {
     RiAddLine,
     RiArrowDownSLine,
     RiCloseLine,
     RiDeleteBinLine
 } from "@remixicon/react"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -267,7 +266,7 @@ export function CoachWeek2HomeworkForm({
     allSeasons,
     playerPicUrl
 }: CoachWeek2HomeworkFormProps) {
-    const router = useRouter()
+    const id = useId()
 
     // Build initial forced move-up map from existing submissions.
     // The teamNumber is recovered by joining week2Rosters in the action.
@@ -295,7 +294,9 @@ export function CoachWeek2HomeworkForm({
     const [recommendedMoveDown, setRecommendedMoveDown] = useState<string[]>(
         initialRecommendedDown.length > 0 ? initialRecommendedDown : []
     )
-    const [submitting, setSubmitting] = useState(false)
+    const { run: submit, pending: submitting } = useAction(
+        submitCoachWeek2Homework
+    )
 
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
@@ -337,9 +338,7 @@ export function CoachWeek2HomeworkForm({
         setRecommendedMoveDown((prev) => prev.filter((_, i) => i !== index))
     }
 
-    const handleSubmit = async () => {
-        setSubmitting(true)
-
+    const handleSubmit = () => {
         const forcedMoveUpByTeamInput = Object.entries(forcedMoveUpByTeam).map(
             ([teamNumber, playerId]) => ({
                 teamNumber: Number(teamNumber),
@@ -347,19 +346,11 @@ export function CoachWeek2HomeworkForm({
             })
         )
 
-        const result = await submitCoachWeek2Homework({
+        void submit({
             forcedMoveUpByTeam: forcedMoveUpByTeamInput,
             recommendedMoveUp: recommendedMoveUp.filter(Boolean),
             recommendedMoveDown: recommendedMoveDown.filter(Boolean)
         })
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setSubmitting(false)
     }
 
     return (
@@ -462,7 +453,7 @@ export function CoachWeek2HomeworkForm({
 
                                 <div className="space-y-2">
                                     <Label
-                                        htmlFor={`forced_up_${team.teamNumber}`}
+                                        htmlFor={`${id}-forced_up_${team.teamNumber}`}
                                     >
                                         Player to move up{" "}
                                         <span className="text-destructive">
@@ -470,7 +461,7 @@ export function CoachWeek2HomeworkForm({
                                         </span>
                                     </Label>
                                     <PlayerSelect
-                                        id={`forced_up_${team.teamNumber}`}
+                                        id={`${id}-forced_up_${team.teamNumber}`}
                                         players={team.players}
                                         value={
                                             forcedMoveUpByTeam[
@@ -529,7 +520,7 @@ export function CoachWeek2HomeworkForm({
                                 className="flex items-center gap-2"
                             >
                                 <PlayerCombobox
-                                    id={`rec_up_${index}`}
+                                    id={`${id}-rec_up_${index}`}
                                     players={allTryoutPlayers}
                                     value={val}
                                     onValueChange={(v) =>
@@ -580,7 +571,7 @@ export function CoachWeek2HomeworkForm({
                                 className="flex items-center gap-2"
                             >
                                 <PlayerCombobox
-                                    id={`rec_down_${index}`}
+                                    id={`${id}-rec_down_${index}`}
                                     players={allTryoutPlayers}
                                     value={val}
                                     onValueChange={(v) =>

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { buildPlayerPictureUrl } from "@/lib/utils"
-import { RiCloseLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { dropCategoryLabel } from "@/lib/signup-drops-display"
 import type {
@@ -917,32 +917,22 @@ export function AdminPlayerDetailPopup({
 
     return (
         <>
-            <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                onClick={onClose}
-                onKeyDown={(e) => {
-                    if (e.key === "Escape") onClose?.()
+            <Dialog
+                open
+                onOpenChange={(next) => {
+                    if (!next) onClose?.()
                 }}
-                role="dialog"
-                aria-modal="true"
-                tabIndex={-1}
             >
-                <div
-                    className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-background p-0 shadow-xl"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    role="document"
+                <DialogContent
+                    aria-describedby={undefined}
+                    className="block max-h-[85vh] max-w-2xl overflow-y-auto p-0"
                 >
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                        <RiCloseLine className="h-5 w-5" />
-                    </button>
+                    <DialogTitle className="sr-only">
+                        {playerAlt || "Player details"}
+                    </DialogTitle>
                     {content}
-                </div>
-            </div>
+                </DialogContent>
+            </Dialog>
 
             {pictureSrc && (
                 <PlayerImageModal

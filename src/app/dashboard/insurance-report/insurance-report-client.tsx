@@ -14,7 +14,7 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import { getInsuranceReport } from "./actions"
 import type { InsuranceGroup } from "./report-logic"
 
@@ -27,6 +27,7 @@ export function InsuranceReportClient({
     years,
     defaultYear
 }: InsuranceReportClientProps) {
+    const yearSelectId = useId()
     const [selectedYear, setSelectedYear] = useState<string>(
         String(defaultYear)
     )
@@ -49,6 +50,11 @@ export function InsuranceReportClient({
                     setGroups([])
                 }
             })
+            .catch(() => {
+                if (!active) return
+                setErrorMessage("Something went wrong. Please try again.")
+                setGroups([])
+            })
             .finally(() => {
                 if (active) setLoading(false)
             })
@@ -65,7 +71,7 @@ export function InsuranceReportClient({
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div className="w-40">
                     <label
-                        htmlFor="insurance-year"
+                        htmlFor={yearSelectId}
                         className="mb-1 block font-medium text-muted-foreground text-sm"
                     >
                         Calendar year
@@ -74,7 +80,7 @@ export function InsuranceReportClient({
                         value={selectedYear}
                         onValueChange={setSelectedYear}
                     >
-                        <SelectTrigger id="insurance-year">
+                        <SelectTrigger id={yearSelectId}>
                             <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>

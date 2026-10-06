@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useId, useState } from "react"
+import { useAction } from "@/components/hooks/use-action"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,22 +22,16 @@ interface Props {
 }
 
 export function TournamentWaiverCard({ tournamentName, waiver }: Props) {
-    const router = useRouter()
+    const agreeId = useId()
     const [open, setOpen] = useState(false)
     const [agreed, setAgreed] = useState(false)
-    const [busy, setBusy] = useState(false)
+    const { run, pending: busy } = useAction(acceptTournamentWaiver, {
+        success: "Waiver accepted. You're cleared to play.",
+        onSuccess: () => setOpen(false)
+    })
 
-    async function handleAccept() {
-        setBusy(true)
-        const result = await acceptTournamentWaiver(waiver.id)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success("Waiver accepted. You're cleared to play.")
-        setOpen(false)
-        router.refresh()
+    function handleAccept() {
+        void run(waiver.id)
     }
 
     return (
@@ -64,12 +57,12 @@ export function TournamentWaiverCard({ tournamentName, waiver }: Props) {
                     <WaiverContent content={waiver.content} />
                     <div className="flex items-start gap-2 pt-2">
                         <Checkbox
-                            id="t-waiver-check"
+                            id={agreeId}
                             checked={agreed}
                             onCheckedChange={(c) => setAgreed(c === true)}
                         />
                         <Label
-                            htmlFor="t-waiver-check"
+                            htmlFor={agreeId}
                             className="font-normal text-sm"
                         >
                             I have read and agree to the waiver.

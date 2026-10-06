@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Card,
     CardContent,
@@ -40,12 +40,12 @@ export function DraftDayForm({
     seasonLabel,
     orderLocked
 }: DraftDayFormProps) {
-    const router = useRouter()
-
     const [captains, setCaptains] = useState<CaptainRow[]>(division.captains)
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
     const [isAnimating, setIsAnimating] = useState(false)
-    const [isSaving, setIsSaving] = useState(false)
+    const { run: save, pending: isSaving } = useAction(saveDraftOrder, {
+        success: "Draft order locked."
+    })
     const [isGenerating, setIsGenerating] = useState<
         "blank" | "prefilled" | null
     >(null)
@@ -78,24 +78,13 @@ export function DraftDayForm({
         setTimeout(tick, INTERVAL)
     }
 
-    const handleSave = async () => {
-        setIsSaving(true)
-
+    const handleSave = () => {
         const assignments = captains.map((c, i) => ({
             teamId: c.teamId,
             number: i + 1
         }))
 
-        const result = await saveDraftOrder(division.divisionId, assignments)
-
-        setIsSaving(false)
-
-        if (result.status) {
-            toast.success(result.message ?? "Draft order locked.")
-            router.refresh()
-        } else {
-            toast.error(result.message ?? "Failed to save draft order.")
-        }
+        void save(division.divisionId, assignments)
     }
 
     const downloadPdf = (bytes: Uint8Array, filename: string) => {
@@ -112,28 +101,36 @@ export function DraftDayForm({
 
     const handleBlankSheet = async () => {
         setIsGenerating("blank")
-        const result = await getDraftSheetData(division.divisionId)
-        if (!result.status) {
-            toast.error(result.message ?? "Failed to load sheet data.")
+        try {
+            const result = await getDraftSheetData(division.divisionId)
+            if (!result.status) {
+                toast.error(result.message ?? "Failed to load sheet data.")
+                return
+            }
+            const bytes = await generateBlankDraftSheet(result.data)
+            downloadPdf(bytes, "blank-draft-sheet.pdf")
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
             setIsGenerating(null)
-            return
         }
-        const bytes = await generateBlankDraftSheet(result.data)
-        downloadPdf(bytes, "blank-draft-sheet.pdf")
-        setIsGenerating(null)
     }
 
     const handlePrefilledSheet = async () => {
         setIsGenerating("prefilled")
-        const result = await getDraftSheetData(division.divisionId)
-        if (!result.status) {
-            toast.error(result.message ?? "Failed to load sheet data.")
+        try {
+            const result = await getDraftSheetData(division.divisionId)
+            if (!result.status) {
+                toast.error(result.message ?? "Failed to load sheet data.")
+                return
+            }
+            const bytes = await generatePrefilledDraftSheet(result.data)
+            downloadPdf(bytes, "prefilled-draft-sheet.pdf")
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
             setIsGenerating(null)
-            return
         }
-        const bytes = await generatePrefilledDraftSheet(result.data)
-        downloadPdf(bytes, "prefilled-draft-sheet.pdf")
-        setIsGenerating(null)
     }
 
     return (

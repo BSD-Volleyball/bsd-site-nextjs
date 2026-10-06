@@ -1,14 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useId, useMemo, useState } from "react"
 import {
     RiAddLine,
     RiArrowDownSLine,
     RiCloseLine,
     RiDeleteBinLine
 } from "@remixicon/react"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -314,7 +313,7 @@ export function Week2HomeworkForm({
     allSeasons,
     playerPicUrl
 }: Week2HomeworkFormProps) {
-    const router = useRouter()
+    const id = useId()
     const initial = buildInitialValues(
         existingSubmissions,
         isTopDivision,
@@ -339,7 +338,7 @@ export function Week2HomeworkForm({
     const [recommendedMoveDown, setRecommendedMoveDown] = useState<string[]>(
         initial.recommendedMoveDown
     )
-    const [submitting, setSubmitting] = useState(false)
+    const { run: submit, pending: submitting } = useAction(submitWeek2Homework)
 
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
@@ -403,10 +402,8 @@ export function Week2HomeworkForm({
         setRecommendedMoveDown((prev) => prev.filter((_, i) => i !== index))
     }
 
-    const handleSubmit = async () => {
-        setSubmitting(true)
-
-        const result = await submitWeek2Homework({
+    const handleSubmit = () => {
+        void submit({
             forcedMoveUpMale,
             forcedMoveUpNonMale,
             forcedMoveDownMale,
@@ -414,14 +411,6 @@ export function Week2HomeworkForm({
             recommendedMoveUp: recommendedMoveUp.filter(Boolean),
             recommendedMoveDown: recommendedMoveDown.filter(Boolean)
         })
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setSubmitting(false)
     }
 
     const hasExisting = existingSubmissions.length > 0
@@ -541,14 +530,14 @@ export function Week2HomeworkForm({
                             </h3>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="forced_up_male">
+                                    <Label htmlFor={`${id}-forced_up_male`}>
                                         Male player to move up{" "}
                                         <span className="text-destructive">
                                             *
                                         </span>
                                     </Label>
                                     <PlayerSelect
-                                        id="forced_up_male"
+                                        id={`${id}-forced_up_male`}
                                         players={maleTeamPlayers}
                                         value={forcedMoveUpMale}
                                         onValueChange={setForcedMoveUpMale}
@@ -564,14 +553,14 @@ export function Week2HomeworkForm({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="forced_up_nonmale">
+                                    <Label htmlFor={`${id}-forced_up_nonmale`}>
                                         Non-male player to move up{" "}
                                         <span className="text-destructive">
                                             *
                                         </span>
                                     </Label>
                                     <PlayerSelect
-                                        id="forced_up_nonmale"
+                                        id={`${id}-forced_up_nonmale`}
                                         players={nonMaleTeamPlayers}
                                         value={forcedMoveUpNonMale}
                                         onValueChange={setForcedMoveUpNonMale}
@@ -597,14 +586,14 @@ export function Week2HomeworkForm({
                             </h3>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="forced_down_male">
+                                    <Label htmlFor={`${id}-forced_down_male`}>
                                         Male player to move down{" "}
                                         <span className="text-destructive">
                                             *
                                         </span>
                                     </Label>
                                     <PlayerSelect
-                                        id="forced_down_male"
+                                        id={`${id}-forced_down_male`}
                                         players={maleTeamPlayers}
                                         value={forcedMoveDownMale}
                                         onValueChange={setForcedMoveDownMale}
@@ -620,14 +609,16 @@ export function Week2HomeworkForm({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="forced_down_nonmale">
+                                    <Label
+                                        htmlFor={`${id}-forced_down_nonmale`}
+                                    >
                                         Non-male player to move down{" "}
                                         <span className="text-destructive">
                                             *
                                         </span>
                                     </Label>
                                     <PlayerSelect
-                                        id="forced_down_nonmale"
+                                        id={`${id}-forced_down_nonmale`}
                                         players={nonMaleTeamPlayers}
                                         value={forcedMoveDownNonMale}
                                         onValueChange={setForcedMoveDownNonMale}
@@ -677,7 +668,7 @@ export function Week2HomeworkForm({
                                 className="flex items-center gap-2"
                             >
                                 <PlayerCombobox
-                                    id={`rec_up_${index}`}
+                                    id={`${id}-rec_up_${index}`}
                                     players={nonCaptainAllTryoutPlayers}
                                     value={val}
                                     onValueChange={(v) =>
@@ -729,7 +720,7 @@ export function Week2HomeworkForm({
                                 className="flex items-center gap-2"
                             >
                                 <PlayerCombobox
-                                    id={`rec_down_${index}`}
+                                    id={`${id}-rec_down_${index}`}
                                     players={nonCaptainAllTryoutPlayers}
                                     value={val}
                                     onValueChange={(v) =>

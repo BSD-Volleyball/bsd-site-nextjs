@@ -1,6 +1,14 @@
 "use client"
 
+import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { RiCloseLine } from "@remixicon/react"
+import {
+    Dialog,
+    DialogClose,
+    DialogOverlay,
+    DialogPortal,
+    DialogTitle
+} from "@/components/ui/dialog"
 
 interface PlayerImageModalProps {
     open: boolean
@@ -15,33 +23,35 @@ export function PlayerImageModal({
     src,
     alt
 }: PlayerImageModalProps) {
-    if (!open) return null
-
     return (
-        <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
-            onClick={onClose}
-            onKeyDown={(e) => {
-                if (e.key === "Escape") onClose()
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!next) onClose()
             }}
-            role="dialog"
-            aria-modal="true"
-            tabIndex={-1}
         >
-            <div className="relative max-h-[90vh] max-w-[90vw]">
-                <img
-                    src={src}
-                    alt={alt}
-                    className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
-                />
-                <button
-                    type="button"
+            <DialogPortal>
+                <DialogOverlay />
+                {/* A bare picture rather than DialogContent's card: the
+                    enlarged photo is the whole panel, and a click anywhere on
+                    it closes it as before. */}
+                <DialogPrimitive.Content
+                    aria-describedby={undefined}
                     onClick={onClose}
-                    className="absolute -top-3 -right-3 rounded-full bg-white p-1 text-black hover:bg-gray-200"
+                    className="fixed top-1/2 left-1/2 z-50 max-h-[90vh] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 focus:outline-none"
                 >
-                    <RiCloseLine className="h-6 w-6" />
-                </button>
-            </div>
-        </div>
+                    <DialogTitle className="sr-only">{alt}</DialogTitle>
+                    <img
+                        src={src}
+                        alt={alt}
+                        className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+                    />
+                    <DialogClose className="absolute -top-3 -right-3 rounded-full bg-white p-1 text-black hover:bg-gray-200">
+                        <RiCloseLine className="h-6 w-6" />
+                        <span className="sr-only">Close</span>
+                    </DialogClose>
+                </DialogPrimitive.Content>
+            </DialogPortal>
+        </Dialog>
     )
 }

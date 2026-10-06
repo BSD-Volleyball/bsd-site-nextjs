@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useId, useState, useMemo } from "react"
 import { PlayerOptionCombobox } from "@/components/user-combobox"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Card,
     CardContent,
@@ -46,8 +46,18 @@ export function CreateTeamsForm({
     divisions,
     users
 }: CreateTeamsFormProps) {
-    const _router = useRouter()
-    const [isLoading, setIsLoading] = useState(false)
+    const id = useId()
+    const { run: create, pending: isLoading } = useAction(createTeams, {
+        refresh: false,
+        onSuccess: () => {
+            // Reset form
+            setCaptains(
+                Array(6)
+                    .fill(null)
+                    .map(() => ({ captainId: null, teamName: "" }))
+            )
+        }
+    })
 
     const [seasonId, setSeasonId] = useState<string>("")
     const [divisionId, setDivisionId] = useState<string>("")
@@ -62,7 +72,7 @@ export function CreateTeamsForm({
         () =>
             captains
                 .map((c) => c.captainId)
-                .filter((id): id is string => id !== null),
+                .filter((cid): cid is string => cid !== null),
         [captains]
     )
 
@@ -111,7 +121,7 @@ export function CreateTeamsForm({
         return `${seasonName} ${season.year}`
     }
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
         if (!seasonId) {
@@ -142,27 +152,11 @@ export function CreateTeamsForm({
             }
         }
 
-        setIsLoading(true)
-
-        const result = await createTeams(
+        void create(
             parseInt(seasonId, 10),
             parseInt(divisionId, 10),
             teamsToCreate
         )
-
-        if (result.status) {
-            toast.success(result.message ?? "Teams created.")
-            // Reset form
-            setCaptains(
-                Array(6)
-                    .fill(null)
-                    .map(() => ({ captainId: null, teamName: "" }))
-            )
-        } else {
-            toast.error(result.message)
-        }
-
-        setIsLoading(false)
     }
 
     const numTeams = parseInt(teamCount, 10)
@@ -180,7 +174,7 @@ export function CreateTeamsForm({
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="season">
+                            <Label htmlFor={`${id}-season`}>
                                 Season{" "}
                                 <span className="text-destructive">*</span>
                             </Label>
@@ -188,7 +182,7 @@ export function CreateTeamsForm({
                                 value={seasonId}
                                 onValueChange={setSeasonId}
                             >
-                                <SelectTrigger id="season">
+                                <SelectTrigger id={`${id}-season`}>
                                     <SelectValue placeholder="Select a season" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -205,7 +199,7 @@ export function CreateTeamsForm({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="division">
+                            <Label htmlFor={`${id}-division`}>
                                 Division{" "}
                                 <span className="text-destructive">*</span>
                             </Label>
@@ -213,7 +207,7 @@ export function CreateTeamsForm({
                                 value={divisionId}
                                 onValueChange={setDivisionId}
                             >
-                                <SelectTrigger id="division">
+                                <SelectTrigger id={`${id}-division`}>
                                     <SelectValue placeholder="Select a division" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -243,18 +237,24 @@ export function CreateTeamsForm({
                             className="flex gap-4"
                         >
                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="6" id="teams-6" />
+                                <RadioGroupItem
+                                    value="6"
+                                    id={`${id}-teams-6`}
+                                />
                                 <Label
-                                    htmlFor="teams-6"
+                                    htmlFor={`${id}-teams-6`}
                                     className="cursor-pointer font-normal"
                                 >
                                     6 Teams
                                 </Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="4" id="teams-4" />
+                                <RadioGroupItem
+                                    value="4"
+                                    id={`${id}-teams-4`}
+                                />
                                 <Label
-                                    htmlFor="teams-4"
+                                    htmlFor={`${id}-teams-4`}
                                     className="cursor-pointer font-normal"
                                 >
                                     4 Teams
@@ -273,14 +273,16 @@ export function CreateTeamsForm({
                                         className="grid grid-cols-2 items-end gap-4"
                                     >
                                         <div className="space-y-2">
-                                            <Label htmlFor={`captain-${index}`}>
+                                            <Label
+                                                htmlFor={`${id}-captain-${index}`}
+                                            >
                                                 Captain {index + 1}{" "}
                                                 <span className="text-destructive">
                                                     *
                                                 </span>
                                             </Label>
                                             <PlayerOptionCombobox
-                                                id={`captain-${index}`}
+                                                id={`${id}-captain-${index}`}
                                                 users={users}
                                                 value={
                                                     captains[index].captainId
@@ -298,7 +300,7 @@ export function CreateTeamsForm({
                                         </div>
                                         <div className="space-y-2">
                                             <Label
-                                                htmlFor={`team-name-${index}`}
+                                                htmlFor={`${id}-team-name-${index}`}
                                             >
                                                 Team Name{" "}
                                                 <span className="text-destructive">
@@ -306,7 +308,7 @@ export function CreateTeamsForm({
                                                 </span>
                                             </Label>
                                             <Input
-                                                id={`team-name-${index}`}
+                                                id={`${id}-team-name-${index}`}
                                                 value={captains[index].teamName}
                                                 onChange={(e) =>
                                                     handleTeamNameChange(

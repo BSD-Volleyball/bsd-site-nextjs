@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useId, useState, useTransition } from "react"
+import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { RiCheckLine, RiArrowUpLine, RiArrowDownLine } from "@remixicon/react"
 import { Badge } from "@/components/ui/badge"
@@ -48,6 +49,7 @@ export function HomeworkStatusView({
     playerPicUrl
 }: HomeworkStatusViewProps) {
     const router = useRouter()
+    const divisionSelectId = useId()
     const [dialogState, setDialogState] = useState<DialogState>(null)
     const [rateData, setRateData] = useState<RatePlayersDetailResult | null>(
         null
@@ -63,8 +65,13 @@ export function HomeworkStatusView({
         setDialogState({ type: "rate", captainId, captainName })
         setRateData(null)
         startTransition(async () => {
-            const data = await getRatePlayersDetail(captainId, seasonId)
-            setRateData(data)
+            try {
+                const data = await getRatePlayersDetail(captainId, seasonId)
+                setRateData(data)
+            } catch {
+                toast.error("Something went wrong. Please try again.")
+                setDialogState(null)
+            }
         })
     }
 
@@ -72,8 +79,13 @@ export function HomeworkStatusView({
         setDialogState({ type: "moving", captainId, captainName })
         setMovingData(null)
         startTransition(async () => {
-            const data = await getMovingDayDetail(captainId, seasonId)
-            setMovingData(data)
+            try {
+                const data = await getMovingDayDetail(captainId, seasonId)
+                setMovingData(data)
+            } catch {
+                toast.error("Something went wrong. Please try again.")
+                setDialogState(null)
+            }
         })
     }
 
@@ -81,8 +93,13 @@ export function HomeworkStatusView({
         setDialogState({ type: "homework", captainId, captainName })
         setHomeworkData(null)
         startTransition(async () => {
-            const data = await getDraftHomeworkDetail(captainId, seasonId)
-            setHomeworkData(data)
+            try {
+                const data = await getDraftHomeworkDetail(captainId, seasonId)
+                setHomeworkData(data)
+            } catch {
+                toast.error("Something went wrong. Please try again.")
+                setDialogState(null)
+            }
         })
     }
 
@@ -103,13 +120,13 @@ export function HomeworkStatusView({
             {canSelectDivision && selectedDivisionId !== null && (
                 <div className="mb-6 flex items-center gap-2">
                     <label
-                        htmlFor="division-select"
+                        htmlFor={divisionSelectId}
                         className="font-medium text-sm"
                     >
                         Division
                     </label>
                     <select
-                        id="division-select"
+                        id={divisionSelectId}
                         value={selectedDivisionId}
                         onChange={(e) =>
                             router.push(

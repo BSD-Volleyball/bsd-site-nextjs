@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { AvailabilityEventPicker } from "@/components/availability-event-picker"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import type { SeasonConfig } from "@/lib/season-types"
 import type { Week1Audience } from "@/lib/week1-priority"
@@ -26,21 +27,26 @@ export function AvailabilityCard({ userId }: AvailabilityCardProps) {
     const [week1Audience, setWeek1Audience] = useState<Week1Audience>("new")
     const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set())
     const [isLoading, setIsLoading] = useState(true)
-    const [isSaving, setIsSaving] = useState(false)
 
     const load = useCallback(async () => {
         setIsLoading(true)
-        const result = await getUserAvailabilityForCurrentSeason(userId)
-        if (result.status) {
-            setConfig(result.data.config)
-            setSignupId(result.data.signupId)
-            setWeek1Audience(result.data.week1Audience)
-            setSelectedEvents(new Set(result.data.unavailableEventIds))
-        } else {
+        try {
+            const result = await getUserAvailabilityForCurrentSeason(userId)
+            if (result.status) {
+                setConfig(result.data.config)
+                setSignupId(result.data.signupId)
+                setWeek1Audience(result.data.week1Audience)
+                setSelectedEvents(new Set(result.data.unavailableEventIds))
+            } else {
+                setConfig(null)
+                toast.error(result.message)
+            }
+        } catch {
             setConfig(null)
-            toast.error(result.message)
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setIsLoading(false)
         }
-        setIsLoading(false)
     }, [userId])
 
     useEffect(() => {
@@ -59,22 +65,13 @@ export function AvailabilityCard({ userId }: AvailabilityCardProps) {
         })
     }
 
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            const result = await saveUserAvailability(
-                userId,
-                Array.from(selectedEvents)
-            )
-            if (result.status) {
-                toast.success(result.message)
-                await load()
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setIsSaving(false)
-        }
+    const { run: save, pending: isSaving } = useAction(saveUserAvailability, {
+        refresh: false,
+        onSuccess: () => void load()
+    })
+
+    const handleSave = () => {
+        void save(userId, Array.from(selectedEvents))
     }
 
     if (isLoading) {

@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { submitConcern } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 export function ReportConcernForm() {
     const router = useRouter()
-    const [isPending, startTransition] = useTransition()
+    const id = useId()
+    const { run, pending: isPending } = useAction(submitConcern, {
+        refresh: false
+    })
     const [submitted, setSubmitted] = useState(false)
     const [submittedText, setSubmittedText] = useState("")
 
@@ -29,32 +32,27 @@ export function ReportConcernForm() {
     const [teamMatch, setTeamMatch] = useState("")
     const [description, setDescription] = useState("")
 
-    function handleSubmit(e: React.FormEvent) {
+    async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
-        startTransition(async () => {
-            const result = await submitConcern({
-                anonymous,
-                contact_name: contactName,
-                contact_email: contactEmail,
-                contact_phone: contactPhone,
-                want_followup: wantFollowup,
-                incident_date: incidentDate,
-                location,
-                person_involved: personInvolved,
-                witnesses,
-                team_match: teamMatch,
-                description
-            })
-
-            if (result.status) {
-                setSubmitted(true)
-                setSubmittedText(result.message ?? "")
-                toast.success(result.message)
-            } else {
-                toast.error(result.message)
-            }
+        const result = await run({
+            anonymous,
+            contact_name: contactName,
+            contact_email: contactEmail,
+            contact_phone: contactPhone,
+            want_followup: wantFollowup,
+            incident_date: incidentDate,
+            location,
+            person_involved: personInvolved,
+            witnesses,
+            team_match: teamMatch,
+            description
         })
+
+        if (result?.status) {
+            setSubmitted(true)
+            setSubmittedText(result.message ?? "")
+        }
     }
 
     if (submitted) {
@@ -83,7 +81,7 @@ export function ReportConcernForm() {
             <div className="rounded-lg border p-4">
                 <div className="flex items-start gap-3">
                     <Checkbox
-                        id="anonymous"
+                        id={`${id}-anonymous`}
                         checked={anonymous}
                         onCheckedChange={(checked) => {
                             setAnonymous(checked === true)
@@ -95,7 +93,7 @@ export function ReportConcernForm() {
                     />
                     <div>
                         <Label
-                            htmlFor="anonymous"
+                            htmlFor={`${id}-anonymous`}
                             className="cursor-pointer font-medium"
                         >
                             Submit anonymously
@@ -115,18 +113,18 @@ export function ReportConcernForm() {
                     <h2 className="font-medium">Your Contact Information</h2>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label htmlFor="contact_name">Name</Label>
+                            <Label htmlFor={`${id}-contact_name`}>Name</Label>
                             <Input
-                                id="contact_name"
+                                id={`${id}-contact_name`}
                                 value={contactName}
                                 onChange={(e) => setContactName(e.target.value)}
                                 placeholder="Your name"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="contact_email">Email</Label>
+                            <Label htmlFor={`${id}-contact_email`}>Email</Label>
                             <Input
-                                id="contact_email"
+                                id={`${id}-contact_email`}
                                 type="email"
                                 value={contactEmail}
                                 onChange={(e) =>
@@ -136,11 +134,11 @@ export function ReportConcernForm() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="contact_phone">
+                            <Label htmlFor={`${id}-contact_phone`}>
                                 Phone (optional)
                             </Label>
                             <Input
-                                id="contact_phone"
+                                id={`${id}-contact_phone`}
                                 type="tel"
                                 value={contactPhone}
                                 onChange={(e) =>
@@ -152,7 +150,7 @@ export function ReportConcernForm() {
                     </div>
                     <div className="flex items-start gap-3 pt-1">
                         <Checkbox
-                            id="want_followup"
+                            id={`${id}-want_followup`}
                             checked={wantFollowup}
                             onCheckedChange={(checked) =>
                                 setWantFollowup(checked === true)
@@ -160,7 +158,7 @@ export function ReportConcernForm() {
                             className="mt-0.5"
                         />
                         <Label
-                            htmlFor="want_followup"
+                            htmlFor={`${id}-want_followup`}
                             className="cursor-pointer"
                         >
                             I would like someone to follow up with me about this
@@ -176,12 +174,12 @@ export function ReportConcernForm() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                        <Label htmlFor="incident_date">
+                        <Label htmlFor={`${id}-incident_date`}>
                             Date of Incident{" "}
                             <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                            id="incident_date"
+                            id={`${id}-incident_date`}
                             type="date"
                             required
                             value={incidentDate}
@@ -189,12 +187,12 @@ export function ReportConcernForm() {
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor="location">
+                        <Label htmlFor={`${id}-location`}>
                             Location of Incident{" "}
                             <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                            id="location"
+                            id={`${id}-location`}
                             required
                             value={location}
                             onChange={(e) => setLocation(e.target.value)}
@@ -204,12 +202,12 @@ export function ReportConcernForm() {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label htmlFor="person_involved">
+                    <Label htmlFor={`${id}-person_involved`}>
                         Person(s) Involved{" "}
                         <span className="text-destructive">*</span>
                     </Label>
                     <Input
-                        id="person_involved"
+                        id={`${id}-person_involved`}
                         required
                         value={personInvolved}
                         onChange={(e) => setPersonInvolved(e.target.value)}
@@ -218,9 +216,11 @@ export function ReportConcernForm() {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label htmlFor="witnesses">Witnesses (optional)</Label>
+                    <Label htmlFor={`${id}-witnesses`}>
+                        Witnesses (optional)
+                    </Label>
                     <Input
-                        id="witnesses"
+                        id={`${id}-witnesses`}
                         value={witnesses}
                         onChange={(e) => setWitnesses(e.target.value)}
                         placeholder="Names of any witnesses"
@@ -228,11 +228,11 @@ export function ReportConcernForm() {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label htmlFor="team_match">
+                    <Label htmlFor={`${id}-team_match`}>
                         Team / Match Involved (optional)
                     </Label>
                     <Input
-                        id="team_match"
+                        id={`${id}-team_match`}
                         value={teamMatch}
                         onChange={(e) => setTeamMatch(e.target.value)}
                         placeholder="e.g. Team Voltron vs. Team Spike"
@@ -240,12 +240,12 @@ export function ReportConcernForm() {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label htmlFor="description">
+                    <Label htmlFor={`${id}-description`}>
                         In your own words, please describe what happened{" "}
                         <span className="text-destructive">*</span>
                     </Label>
                     <Textarea
-                        id="description"
+                        id={`${id}-description`}
                         required
                         rows={6}
                         value={description}

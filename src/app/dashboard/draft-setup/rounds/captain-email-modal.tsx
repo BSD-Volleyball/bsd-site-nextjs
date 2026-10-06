@@ -1,10 +1,15 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import type { PrepareForDraftData, CaptainInfo } from "./actions"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { RiCloseLine } from "@remixicon/react"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
 import { LexicalEmailPreview } from "@/components/email-template/lexical-email-preview"
 import {
     normalizeEmailTemplateContent,
@@ -39,16 +44,6 @@ export function CaptainEmailModal({
     const [copySubjectSuccess, setCopySubjectSuccess] = useState(false)
     const [copyPlainTextSuccess, setCopyPlainTextSuccess] = useState(false)
     const [copyRichTextSuccess, setCopyRichTextSuccess] = useState(false)
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                onClose()
-            }
-        }
-        document.addEventListener("keydown", handleKeyDown)
-        return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [onClose])
 
     const baseEmailTemplateContent = useMemo(
         () =>
@@ -179,30 +174,19 @@ export function CaptainEmailModal({
     }
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            onClick={onClose}
-            onKeyDown={(e) => {
-                if (e.key === "Escape") onClose()
+        <Dialog
+            open
+            onOpenChange={(open) => {
+                if (!open) onClose()
             }}
-            role="dialog"
-            aria-modal="true"
-            tabIndex={-1}
         >
-            <div
-                className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-6 shadow-xl"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                role="document"
+            <DialogContent
+                className="block max-h-[85vh] max-w-lg overflow-y-auto"
+                aria-describedby={undefined}
             >
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                >
-                    <RiCloseLine className="h-5 w-5" />
-                </button>
-                <h3 className="mb-4 font-semibold text-lg">Email Captains</h3>
+                <DialogHeader className="mb-4">
+                    <DialogTitle>Email Captains</DialogTitle>
+                </DialogHeader>
                 <Card className="mb-4 p-4">
                     <h4 className="mb-2 font-medium text-sm">Recipients</h4>
                     <p className="mb-2 break-all text-sm">
@@ -267,7 +251,7 @@ export function CaptainEmailModal({
                         </div>
                     </Card>
                 )}
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     )
 }

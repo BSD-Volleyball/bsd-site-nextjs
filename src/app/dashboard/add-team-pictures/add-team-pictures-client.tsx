@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,6 +41,7 @@ export function AddTeamPicturesClient({
     seasonOptions,
     currentSeasonId
 }: AddTeamPicturesClientProps) {
+    const seasonSelectId = useId()
     const [selectedSeasonId, setSelectedSeasonId] = useState(currentSeasonId)
     // Server-rendered teams for the current season; replaced client-side when
     // an admin switches to a previous season.
@@ -87,6 +88,9 @@ export function AddTeamPicturesClient({
                 toast.error(result.message)
             }
             setTeamGroups(result.status ? result.data : [])
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+            setTeamGroups([])
         } finally {
             setLoadingTeams(false)
         }
@@ -170,6 +174,8 @@ export function AddTeamPicturesClient({
             })
 
             toast.success("Team photo uploaded.")
+        } catch {
+            toast.error("Something went wrong. Please try again.")
         } finally {
             clearFileInput(teamId)
             setUploadingTeamId(null)
@@ -179,7 +185,7 @@ export function AddTeamPicturesClient({
     const seasonSelector = seasonOptions.length > 0 && (
         <div className="w-56">
             <label
-                htmlFor="team-pictures-season"
+                htmlFor={seasonSelectId}
                 className="mb-1 block font-medium text-muted-foreground text-sm"
             >
                 Season
@@ -189,7 +195,7 @@ export function AddTeamPicturesClient({
                 onValueChange={(value) => void handleSeasonChange(value)}
                 disabled={loadingTeams || !!uploadingTeamId}
             >
-                <SelectTrigger id="team-pictures-season">
+                <SelectTrigger id={seasonSelectId}>
                     <SelectValue placeholder="Select season" />
                 </SelectTrigger>
                 <SelectContent>

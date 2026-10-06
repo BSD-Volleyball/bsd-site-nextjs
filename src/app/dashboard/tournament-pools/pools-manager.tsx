@@ -26,14 +26,20 @@ export function TournamentPoolsManager({ view }: Props) {
 
     async function run(p: Promise<{ status: boolean; message?: string }>) {
         setBusy(true)
-        const result = await p
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message ?? "Failed.")
+        try {
+            const result = await p
+            if (!result.status) {
+                toast.error(result.message ?? "Failed.")
+                return false
+            }
+            router.refresh()
+            return true
+        } catch {
+            toast.error("Something went wrong. Please try again.")
             return false
+        } finally {
+            setBusy(false)
         }
-        router.refresh()
-        return true
     }
 
     return (

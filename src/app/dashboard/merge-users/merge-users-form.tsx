@@ -141,25 +141,37 @@ export function MergeUsersForm({
         setIsLoading(true)
         setResult(null)
 
-        getMergeCandidateDetails(userAId, userBId).then((response) => {
-            if (requestRef.current !== requestId) {
-                return
-            }
-            setIsLoading(false)
+        getMergeCandidateDetails(userAId, userBId)
+            .then((response) => {
+                if (requestRef.current !== requestId) {
+                    return
+                }
+                setIsLoading(false)
 
-            if (!response.status || !response.data) {
+                if (!response.status || !response.data) {
+                    setCandidates(null)
+                    setResult({
+                        status: false,
+                        message:
+                            response.message ?? "Could not load those accounts."
+                    })
+                    return
+                }
+
+                setCandidates(response.data)
+                setSelection(response.data.defaults)
+            })
+            .catch(() => {
+                if (requestRef.current !== requestId) {
+                    return
+                }
+                setIsLoading(false)
                 setCandidates(null)
                 setResult({
                     status: false,
-                    message:
-                        response.message ?? "Could not load those accounts."
+                    message: "Something went wrong. Please try again."
                 })
-                return
-            }
-
-            setCandidates(response.data)
-            setSelection(response.data.defaults)
-        })
+            })
     }, [userAId, userBId])
 
     // The email choice decides which record survives -- logins belong to an
@@ -257,20 +269,28 @@ export function MergeUsersForm({
         setIsSubmitting(true)
         setResult(null)
 
-        const response = await mergeUsers(userAId, userBId, selection)
-        setResult({
-            status: response.status,
-            message: response.message ?? ""
-        })
-        setIsSubmitting(false)
-        setShowConfirm(false)
+        try {
+            const response = await mergeUsers(userAId, userBId, selection)
+            setResult({
+                status: response.status,
+                message: response.message ?? ""
+            })
 
-        if (response.status) {
-            setUserAId("")
-            setUserBId("")
-            setCandidates(null)
-            setSelection({})
-            setOnFieldsStep(false)
+            if (response.status) {
+                setUserAId("")
+                setUserBId("")
+                setCandidates(null)
+                setSelection({})
+                setOnFieldsStep(false)
+            }
+        } catch {
+            setResult({
+                status: false,
+                message: "Something went wrong. Please try again."
+            })
+        } finally {
+            setIsSubmitting(false)
+            setShowConfirm(false)
         }
     }
 

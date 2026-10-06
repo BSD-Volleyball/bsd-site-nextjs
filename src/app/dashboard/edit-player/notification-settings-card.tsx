@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { NotificationPreferencesEditor } from "@/components/notifications/notification-preferences-editor"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { STREAM_LABELS, type NotificationType } from "@/lib/notifications/types"
 import {
@@ -28,39 +29,36 @@ export function NotificationSettingsCard({
     const [suppressions, setSuppressions] = useState<SuppressionView[]>([])
     const [emailStatus, setEmailStatus] = useState<string>("valid")
     const [isLoading, setIsLoading] = useState(true)
-    const [isSaving, setIsSaving] = useState(false)
 
     const load = useCallback(async () => {
         setIsLoading(true)
-        const result = await getUserNotificationSettings(userId)
-        if (result.status) {
-            setOptedOut(new Set(result.data.optedOut))
-            setSuppressions(result.data.suppressions)
-            setEmailStatus(result.data.emailStatus)
-        } else {
-            toast.error(result.message)
+        try {
+            const result = await getUserNotificationSettings(userId)
+            if (result.status) {
+                setOptedOut(new Set(result.data.optedOut))
+                setSuppressions(result.data.suppressions)
+                setEmailStatus(result.data.emailStatus)
+            } else {
+                toast.error(result.message)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setIsLoading(false)
         }
-        setIsLoading(false)
     }, [userId])
 
     useEffect(() => {
         void load()
     }, [load])
 
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            const result = await saveUserNotificationSettings(userId, [
-                ...optedOut
-            ])
-            if (result.status) {
-                toast.success(result.message)
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setIsSaving(false)
-        }
+    const { run: save, pending: isSaving } = useAction(
+        saveUserNotificationSettings,
+        { refresh: false }
+    )
+
+    const handleSave = () => {
+        void save(userId, [...optedOut])
     }
 
     if (isLoading) {

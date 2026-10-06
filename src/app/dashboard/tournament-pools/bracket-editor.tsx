@@ -78,15 +78,21 @@ export function TournamentBracketEditor({ view }: Props) {
         successMsg?: string
     ) {
         setBusy(true)
-        const result = await p
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message ?? "Failed.")
+        try {
+            const result = await p
+            if (!result.status) {
+                toast.error(result.message ?? "Failed.")
+                return false
+            }
+            if (successMsg) toast.success(successMsg)
+            router.refresh()
+            return true
+        } catch {
+            toast.error("Something went wrong. Please try again.")
             return false
+        } finally {
+            setBusy(false)
         }
-        if (successMsg) toast.success(successMsg)
-        router.refresh()
-        return true
     }
 
     // Placing a team removes it from any slot it currently occupies (a move);

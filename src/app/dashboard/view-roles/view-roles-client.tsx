@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useId, useState, useTransition } from "react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import {
     Select,
@@ -20,6 +21,7 @@ interface ViewRolesClientProps {
 }
 
 export function ViewRolesClient({ playerPicUrl }: ViewRolesClientProps) {
+    const roleSelectId = useId()
     const [selectedRole, setSelectedRole] = useState("")
     const [holders, setHolders] = useState<RoleHolder[]>([])
     const [isPending, startTransition] = useTransition()
@@ -45,7 +47,11 @@ export function ViewRolesClient({ playerPicUrl }: ViewRolesClientProps) {
     function handleRoleChange(role: string) {
         setSelectedRole(role)
         startTransition(async () => {
-            setHolders(await getUsersWithRole(role))
+            try {
+                setHolders(await getUsersWithRole(role))
+            } catch {
+                toast.error("Something went wrong. Please try again.")
+            }
         })
     }
 
@@ -53,13 +59,13 @@ export function ViewRolesClient({ playerPicUrl }: ViewRolesClientProps) {
         <div className="space-y-6">
             <div className="w-64">
                 <label
-                    htmlFor="role-select"
+                    htmlFor={roleSelectId}
                     className="mb-1 block font-medium text-muted-foreground text-sm"
                 >
                     Role
                 </label>
                 <Select value={selectedRole} onValueChange={handleRoleChange}>
-                    <SelectTrigger id="role-select">
+                    <SelectTrigger id={roleSelectId}>
                         <SelectValue placeholder="Select a role…" />
                     </SelectTrigger>
                     <SelectContent>

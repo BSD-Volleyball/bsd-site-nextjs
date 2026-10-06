@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Card,
     CardContent,
@@ -37,11 +37,23 @@ export function CreateTournamentCard({
     currentPhaseIsComplete
 }: CreateTournamentCardProps) {
     const router = useRouter()
+    const id = useId()
     const [name, setName] = useState("")
     const [year, setYear] = useState(String(new Date().getFullYear()))
     const [code, setCode] = useState("")
-    const [saving, setSaving] = useState(false)
     const [confirmOpen, setConfirmOpen] = useState(false)
+    const { run, pending: saving } = useAction(createTournament, {
+        refresh: false,
+        onSuccess: () => {
+            setConfirmOpen(false)
+            setName("")
+            setCode("")
+            // The new tournament is now the current one, so Tournament
+            // Configuration loads it — send the admin there to edit the
+            // cloned dates, costs, and divisions.
+            router.push("/dashboard/tournament-config")
+        }
+    })
 
     const yearNum = Number(year)
     const label = name.trim() ? `${name.trim()} (${year})` : ""
@@ -55,29 +67,12 @@ export function CreateTournamentCard({
     const blocked =
         currentTournamentLabel !== undefined && currentPhaseIsComplete === false
 
-    async function handleConfirm() {
-        setSaving(true)
-        try {
-            const result = await createTournament({
-                name: name.trim(),
-                year: yearNum,
-                code: code.trim()
-            })
-            if (result.status) {
-                toast.success(result.message ?? "Tournament created")
-                setConfirmOpen(false)
-                setName("")
-                setCode("")
-                // The new tournament is now the current one, so Tournament
-                // Configuration loads it — send the admin there to edit the
-                // cloned dates, costs, and divisions.
-                router.push("/dashboard/tournament-config")
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setSaving(false)
-        }
+    function handleConfirm() {
+        void run({
+            name: name.trim(),
+            year: yearNum,
+            code: code.trim()
+        })
     }
 
     return (
@@ -94,18 +89,18 @@ export function CreateTournamentCard({
             <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                        <Label htmlFor="new-tournament-name">Name</Label>
+                        <Label htmlFor={`${id}-name`}>Name</Label>
                         <Input
-                            id="new-tournament-name"
+                            id={`${id}-name`}
                             value={name}
                             placeholder="Summer Slam"
                             onChange={(e) => setName(e.target.value)}
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-tournament-year">Year</Label>
+                        <Label htmlFor={`${id}-year`}>Year</Label>
                         <Input
-                            id="new-tournament-year"
+                            id={`${id}-year`}
                             type="number"
                             inputMode="numeric"
                             value={year}
@@ -113,9 +108,9 @@ export function CreateTournamentCard({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-tournament-code">Code</Label>
+                        <Label htmlFor={`${id}-code`}>Code</Label>
                         <Input
-                            id="new-tournament-code"
+                            id={`${id}-code`}
                             value={code}
                             placeholder="summer-slam-26"
                             onChange={(e) => setCode(e.target.value)}

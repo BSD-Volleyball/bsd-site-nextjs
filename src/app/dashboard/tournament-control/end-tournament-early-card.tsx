@@ -1,8 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Card,
     CardContent,
@@ -29,19 +27,12 @@ interface Props {
 }
 
 export function EndTournamentEarlyCard({ tournamentId }: Props) {
-    const router = useRouter()
-    const [loading, setLoading] = useState(false)
+    const { run, pending: loading } = useAction(endTournamentEarly, {
+        success: (data) => data.message
+    })
 
-    async function handleEndEarly() {
-        setLoading(true)
-        const result = await endTournamentEarly(tournamentId)
-        if (result.status) {
-            toast.success(result.data.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setLoading(false)
+    function handleEndEarly() {
+        void run(tournamentId)
     }
 
     return (
