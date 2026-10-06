@@ -27,6 +27,10 @@ updates:
       # @cloudflare/vitest-plugin peers vitest ^4; move together when it does.
       - dependency-name: vitest
         update-types: [version-update:semver-major]
+      # The worker stays on TypeScript 5.9 (its Workers types and pool are
+      # built against it); move it deliberately, not via a bot PR.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
