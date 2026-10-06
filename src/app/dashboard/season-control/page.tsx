@@ -11,8 +11,6 @@ export const metadata: Metadata = {
     title: "Season Control"
 }
 
-export const revalidate = 300
-
 export default async function SeasonControlPage() {
     await requireAdminOrRedirect()
 

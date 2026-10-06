@@ -12,8 +12,6 @@ export const metadata: Metadata = {
     title: "Add Pictures"
 }
 
-export const revalidate = 300
-
 export default async function AddPicturesPage() {
     await requireSessionOrRedirect()
 

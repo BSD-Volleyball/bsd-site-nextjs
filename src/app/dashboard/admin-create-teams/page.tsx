@@ -9,8 +9,6 @@ export const metadata: Metadata = {
     title: "Admin Create Teams"
 }
 
-export const revalidate = 300
-
 export default async function AdminCreateTeamsPage() {
     await requireAdminOrRedirect()
 

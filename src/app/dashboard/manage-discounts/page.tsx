@@ -9,8 +9,6 @@ export const metadata: Metadata = {
     title: "Manage Discounts"
 }
 
-export const revalidate = 300
-
 export default async function ManageDiscountsPage() {
     await requireAdminOrRedirect()
 

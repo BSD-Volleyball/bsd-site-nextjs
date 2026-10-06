@@ -10,8 +10,6 @@ export const metadata: Metadata = {
     title: "Create Divisions"
 }
 
-export const revalidate = 300
-
 export default async function CreateDivisionsPage() {
     await requireAdminOrRedirect()
 

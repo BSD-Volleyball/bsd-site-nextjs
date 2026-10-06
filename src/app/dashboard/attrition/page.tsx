@@ -9,8 +9,6 @@ export const metadata: Metadata = {
     title: "Attrition"
 }
 
-export const revalidate = 300
-
 export default async function AttritionPage() {
     await requireAdminOrRedirect()
 

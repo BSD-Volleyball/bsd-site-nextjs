@@ -10,8 +10,6 @@ export const metadata: Metadata = {
     title: "Audit Log"
 }
 
-export const revalidate = 300
-
 export default async function AuditLogPage() {
     await requireAdminOrRedirect()
 

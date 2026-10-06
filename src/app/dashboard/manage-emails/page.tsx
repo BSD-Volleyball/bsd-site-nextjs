@@ -10,8 +10,6 @@ export const metadata: Metadata = {
     title: "Manage Emails"
 }
 
-export const revalidate = 300
-
 export default async function ManageEmailsPage({
     searchParams
 }: {

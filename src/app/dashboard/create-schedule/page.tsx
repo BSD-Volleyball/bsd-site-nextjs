@@ -9,8 +9,6 @@ export const metadata: Metadata = {
     title: "Create Schedule"
 }
 
-export const revalidate = 300
-
 export default async function CreateSchedulePage() {
     await requireAdminOrRedirect()
 

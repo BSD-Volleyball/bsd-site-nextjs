@@ -11,8 +11,6 @@ export const metadata: Metadata = {
     title: "Manage Concerns"
 }
 
-export const revalidate = 300
-
 export default async function ManageConcernsPage() {
     const config = await getSeasonConfig()
     await requirePermissionOrRedirect("concerns:view", {

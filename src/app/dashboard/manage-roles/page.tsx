@@ -8,8 +8,6 @@ export const metadata: Metadata = {
     title: "Manage Roles"
 }
 
-export const revalidate = 300
-
 export default async function ManageRolesPage() {
     await requireAdminOrRedirect()
 

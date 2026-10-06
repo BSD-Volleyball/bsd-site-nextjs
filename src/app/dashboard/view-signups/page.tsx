@@ -10,8 +10,6 @@ export const metadata: Metadata = {
     title: "View Signups"
 }
 
-export const revalidate = 300
-
 export default async function ViewSignupsPage() {
     await requireCaptainAccessOrRedirect()
 

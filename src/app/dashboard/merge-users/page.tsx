@@ -8,8 +8,6 @@ export const metadata: Metadata = {
     title: "Merge Users"
 }
 
-export const revalidate = 300
-
 export default async function MergeUsersPage({
     searchParams
 }: {

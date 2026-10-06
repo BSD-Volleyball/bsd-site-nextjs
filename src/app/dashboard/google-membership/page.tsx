@@ -9,8 +9,6 @@ export const metadata: Metadata = {
     title: "Google Membership"
 }
 
-export const revalidate = 300
-
 interface GoogleMembershipPageProps {
     searchParams?: Promise<{
         q?: string

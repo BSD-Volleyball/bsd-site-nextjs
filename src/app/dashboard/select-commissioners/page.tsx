@@ -10,8 +10,6 @@ export const metadata: Metadata = {
     title: "Select Commissioners"
 }
 
-export const revalidate = 300
-
 export default async function SelectCommissionersPage() {
     await requireAdminOrRedirect()
 

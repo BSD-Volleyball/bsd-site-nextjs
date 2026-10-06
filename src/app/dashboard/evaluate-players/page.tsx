@@ -9,8 +9,6 @@ export const metadata: Metadata = {
     title: "Evaluate New Players"
 }
 
-export const revalidate = 300
-
 export default async function EvaluatePlayersPage() {
     await requireAdminOrRedirect()
 
