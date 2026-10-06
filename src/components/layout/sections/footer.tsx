@@ -67,6 +67,10 @@ const socialLinks: FooterLinkProps[] = [
     }
 ]
 
+function externalProps(external?: boolean) {
+    return external ? { target: "_blank", rel: "noopener noreferrer" } : {}
+}
+
 export const FooterSection = async () => {
     const config = await getCachedSeasonConfig()
     const seasonLabel = formatSeasonLabel(config)
@@ -85,77 +89,70 @@ export const FooterSection = async () => {
             <div className="mx-auto max-w-7xl pt-16 pb-0 lg:pb-12">
                 <div className="relative overflow-hidden rounded-xl border border-border bg-card/50 shadow-xl backdrop-blur-sm">
                     <div className="relative p-8 lg:p-12">
-                        {/* Main Footer Content */}
-                        <div className="space-y-8 lg:space-y-0">
-                            {/* Desktop Layout: Side by side */}
-                            <div className="hidden gap-12 lg:grid lg:grid-cols-5">
-                                {/* Brand Section */}
-                                <div className="col-span-2">
-                                    <Link
-                                        href="/?stay=1"
-                                        className="group mb-4 flex gap-2 font-bold"
-                                    >
-                                        <Image
-                                            src={site.logo}
-                                            alt={site.name}
-                                            width={30}
-                                            height={30}
-                                        />
-                                        <h3 className="font-bold text-2xl">
-                                            BSD Volleyball
-                                        </h3>
-                                    </Link>
-                                    <p className="mb-6 text-muted-foreground leading-relaxed">
-                                        A recreational co-ed volleyball league
-                                        in the Washington DC metro area. Join us
-                                        for competitive play, meet new people,
-                                        and have fun!
-                                    </p>
+                        {/* One responsive layout: stacked on mobile, five
+                            columns from lg (brand spans two; the link
+                            sections join the grid via lg:contents). */}
+                        <div className="grid gap-8 lg:grid-cols-5 lg:gap-12">
+                            <div className="lg:col-span-2">
+                                <Link
+                                    href="/?stay=1"
+                                    className="group mb-4 flex gap-2 font-bold"
+                                >
+                                    <Image
+                                        src={site.logo}
+                                        alt={site.name}
+                                        width={30}
+                                        height={30}
+                                    />
+                                    <h3 className="font-bold text-2xl">
+                                        BSD Volleyball
+                                    </h3>
+                                </Link>
+                                <p className="mb-6 max-w-sm text-muted-foreground text-sm leading-relaxed lg:max-w-none lg:text-base">
+                                    A recreational co-ed volleyball league in
+                                    the Washington DC metro area.
+                                    <span className="hidden lg:inline">
+                                        {" "}
+                                        Join us for competitive play, meet new
+                                        people, and have fun!
+                                    </span>
+                                </p>
 
-                                    <div className="mb-4 flex items-start gap-2 text-muted-foreground text-sm">
-                                        <RiMapPinLine className="mt-0.5 size-4 shrink-0" />
-                                        <span>
-                                            Maryland SoccerPlex
-                                            <br />
-                                            18031 Central Park Circle
-                                            <br />
-                                            Boyds, MD 20841
-                                        </span>
-                                    </div>
-
-                                    {/* Contact */}
-                                    <div className="flex gap-2">
-                                        {socialLinks.map((social) => (
-                                            <Button
-                                                key={social.label}
-                                                asChild
-                                                variant="ghost"
-                                                size="sm"
-                                                className="p-2 hover:bg-accent/50"
-                                            >
-                                                <Link
-                                                    href={social.href}
-                                                    target={
-                                                        social.external
-                                                            ? "_blank"
-                                                            : undefined
-                                                    }
-                                                    rel={
-                                                        social.external
-                                                            ? "noopener noreferrer"
-                                                            : undefined
-                                                    }
-                                                    aria-label={social.label}
-                                                >
-                                                    {social.icon ||
-                                                        social.label}
-                                                </Link>
-                                            </Button>
-                                        ))}
-                                    </div>
+                                <div className="mb-4 hidden items-start gap-2 text-muted-foreground text-sm lg:flex">
+                                    <RiMapPinLine className="mt-0.5 size-4 shrink-0" />
+                                    <span>
+                                        Maryland SoccerPlex
+                                        <br />
+                                        18031 Central Park Circle
+                                        <br />
+                                        Boyds, MD 20841
+                                    </span>
                                 </div>
 
-                                {/* Footer Links Desktop */}
+                                <div className="flex gap-2">
+                                    {socialLinks.map((social) => (
+                                        <Button
+                                            key={social.label}
+                                            asChild
+                                            variant="ghost"
+                                            size="sm"
+                                            className="p-2 hover:bg-accent/50"
+                                        >
+                                            <Link
+                                                href={social.href}
+                                                {...externalProps(
+                                                    social.external
+                                                )}
+                                                aria-label={social.label}
+                                            >
+                                                {social.icon || social.label}
+                                            </Link>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:contents">
                                 {sections.map((section) => (
                                     <div
                                         key={section.title}
@@ -169,16 +166,9 @@ export const FooterSection = async () => {
                                                 <li key={link.label}>
                                                     <Link
                                                         href={link.href}
-                                                        target={
+                                                        {...externalProps(
                                                             link.external
-                                                                ? "_blank"
-                                                                : undefined
-                                                        }
-                                                        rel={
-                                                            link.external
-                                                                ? "noopener noreferrer"
-                                                                : undefined
-                                                        }
+                                                        )}
                                                         className="text-muted-foreground text-sm underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
                                                     >
                                                         {link.label}
@@ -189,102 +179,6 @@ export const FooterSection = async () => {
                                         </ul>
                                     </div>
                                 ))}
-                            </div>
-
-                            {/* Mobile/Tablet Layout: Stacked */}
-                            <div className="lg:hidden">
-                                {/* Brand Section Mobile */}
-                                <div className="mb-8">
-                                    <Link
-                                        href="/?stay=1"
-                                        className="group mb-4 flex gap-2 font-bold"
-                                    >
-                                        <div className="relative">
-                                            <Image
-                                                src={site.logo}
-                                                alt={site.name}
-                                                width={30}
-                                                height={30}
-                                            />
-                                        </div>
-                                        <h3 className="font-bold text-2xl">
-                                            BSD Volleyball
-                                        </h3>
-                                    </Link>
-                                    <p className="mb-6 max-w-sm text-muted-foreground text-sm leading-relaxed">
-                                        A recreational co-ed volleyball league
-                                        in the Washington DC metro area.
-                                    </p>
-
-                                    {/* Contact Mobile */}
-                                    <div className="flex gap-2">
-                                        {socialLinks.map((social) => (
-                                            <Button
-                                                key={social.label}
-                                                asChild
-                                                variant="ghost"
-                                                size="sm"
-                                                className="p-2 hover:bg-accent/50"
-                                            >
-                                                <Link
-                                                    href={social.href}
-                                                    target={
-                                                        social.external
-                                                            ? "_blank"
-                                                            : undefined
-                                                    }
-                                                    rel={
-                                                        social.external
-                                                            ? "noopener noreferrer"
-                                                            : undefined
-                                                    }
-                                                    aria-label={social.label}
-                                                >
-                                                    {social.icon ||
-                                                        social.label}
-                                                </Link>
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Footer Links Mobile - Grid */}
-                                <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-                                    {sections.map((section) => (
-                                        <div
-                                            key={section.title}
-                                            className="flex flex-col"
-                                        >
-                                            <h4 className="mb-4 font-semibold text-foreground text-sm uppercase tracking-wide">
-                                                {section.title}
-                                            </h4>
-                                            <ul className="space-y-3">
-                                                {section.links.map((link) => (
-                                                    <li key={link.label}>
-                                                        <Link
-                                                            href={link.href}
-                                                            target={
-                                                                link.external
-                                                                    ? "_blank"
-                                                                    : undefined
-                                                            }
-                                                            rel={
-                                                                link.external
-                                                                    ? "noopener noreferrer"
-                                                                    : undefined
-                                                            }
-                                                            className="text-muted-foreground text-sm underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
-                                                        >
-                                                            {link.label}
-                                                            {link.external &&
-                                                                " ↗"}
-                                                        </Link>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ))}
-                                </div>
                             </div>
                         </div>
 
