@@ -28,6 +28,13 @@ const guardPatterns = [
 // keep it that way unless a public endpoint is a deliberate product decision.
 const publicAllowlist = new Set([])
 
+// data.ts loaders that take the caller's identity as an argument (the page
+// resolved the session and passes session.user.id), like src/lib functions.
+// They are not endpoints; the page's guard is the access check.
+const callerAuthenticatedLoaders = new Set([
+    "src/app/dashboard/friends/data.ts:getFriendsPageData"
+])
+
 const strictExpectations = [
     {
         key: "src/app/dashboard/view-signups/actions.ts:getSignupsData",
@@ -95,10 +102,15 @@ const strictExpectations = [
     }
 ]
 
-// A file is scanned when it is named *actions.ts OR when its content starts
-// with a "use server" directive (server actions can live in any filename).
+// A file is scanned when it is named *actions.ts or data.ts, OR when its
+// content starts with a "use server" directive (server actions can live in
+// any filename).
 function isServerActionFile(fullPath, name) {
     if (name.endsWith("actions.ts")) return true
+    // Server-only data loaders (data.ts) are not endpoints, but they are the
+    // reads pages render from; their exported functions must still guard
+    // access, so they are held to the same rule.
+    if (name === "data.ts") return true
     if (!name.endsWith(".ts")) return false
     const content = fs.readFileSync(fullPath, "utf8")
     return /^["']use server["']/.test(content.trimStart())
@@ -188,7 +200,10 @@ function main() {
             const line = getLineNumber(content, fn.start)
             functionBlocks.set(key, { block, relPath, line, fnName: fn.name })
 
-            if (publicAllowlist.has(key)) {
+            if (
+                publicAllowlist.has(key) ||
+                callerAuthenticatedLoaders.has(key)
+            ) {
                 continue
             }
 
