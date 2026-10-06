@@ -9,27 +9,16 @@
  * per-round dedupe key in notification_log makes repeat sends no-ops.
  */
 
-import { timingSafeEqual } from "node:crypto"
 import { type NextRequest, NextResponse } from "next/server"
+import { isAuthorizedCronRequest } from "@/lib/cron-auth"
 import { logger } from "@/lib/logger"
 import { autoCloseExpiredSurveys } from "@/lib/surveys/lifecycle"
 import { sendDueSurveyReminders } from "@/lib/surveys/reminders"
 
 export const maxDuration = 300
 
-function isAuthorized(request: NextRequest): boolean {
-    const secret = process.env.CRON_SECRET
-    if (!secret) return false
-    const provided = Buffer.from(request.headers.get("authorization") ?? "")
-    const expected = Buffer.from(`Bearer ${secret}`)
-    return (
-        provided.length === expected.length &&
-        timingSafeEqual(provided, expected)
-    )
-}
-
 export async function GET(request: NextRequest) {
-    if (!isAuthorized(request)) {
+    if (!isAuthorizedCronRequest(request)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
