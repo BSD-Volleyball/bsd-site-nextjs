@@ -11,7 +11,7 @@
  * affects a read: the scores are the point, the corpus is a by-product.
  */
 
-import { and, eq, inArray, isNull } from "drizzle-orm"
+import { and, eq, inArray, isNull, ne } from "drizzle-orm"
 
 import { db } from "@/database/db"
 import {
@@ -170,17 +170,47 @@ export async function labelConfirmedSamples(
     }
 }
 
-/** Mark a read as confirmed once its scores have been saved. */
-export async function markReadConfirmed(
-    readId: number,
+/**
+ * Mark the reads behind these matches as confirmed once their scores are
+ * saved, so the score-sheet inbox stops listing them as awaiting review. The
+ * save path knows which matches it wrote, not which read the admin filled
+ * them from, so reads are found through their samples (each sample records
+ * its read and match). Like labelling, this never affects the save.
+ */
+export async function confirmReadsForMatches(
+    matchIds: readonly number[],
     userId: string
-): Promise<void> {
-    await db
-        .update(scoreSheetReads)
-        .set({
-            status: "confirmed",
-            confirmed_at: new Date(),
-            confirmed_by: userId
+): Promise<number> {
+    if (matchIds.length === 0) return 0
+    try {
+        const reads = await db
+            .selectDistinct({ readId: scoreSheetScoreSamples.read_id })
+            .from(scoreSheetScoreSamples)
+            .where(inArray(scoreSheetScoreSamples.match_id, [...matchIds]))
+        const readIds = reads
+            .map((r) => r.readId)
+            .filter((id): id is number => id !== null)
+        if (readIds.length === 0) return 0
+
+        const confirmed = await db
+            .update(scoreSheetReads)
+            .set({
+                status: "confirmed",
+                confirmed_at: new Date(),
+                confirmed_by: userId
+            })
+            .where(
+                and(
+                    inArray(scoreSheetReads.id, readIds),
+                    ne(scoreSheetReads.status, "confirmed")
+                )
+            )
+            .returning({ id: scoreSheetReads.id })
+        return confirmed.length
+    } catch (error) {
+        logger.error("[scoresheets] Could not confirm reads", {
+            error: error instanceof Error ? error.message : String(error)
         })
-        .where(eq(scoreSheetReads.id, readId))
+        return 0
+    }
 }

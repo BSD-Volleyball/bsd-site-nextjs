@@ -1,7 +1,7 @@
 "use server"
 
 import { aliasedTable, and, asc, desc, eq, inArray } from "drizzle-orm"
-import { revalidatePath, revalidateTag } from "next/cache"
+import { revalidatePath, updateTag } from "next/cache"
 import { PUBLIC_SPONSORS_TAG } from "@/next/public-cache"
 import { db } from "@/database/db"
 import { sponsors, sponsorships, users } from "@/database/schema"
@@ -81,7 +81,7 @@ function revalidateSponsorPages() {
     revalidatePath("/dashboard")
     revalidatePath("/sponsors")
     revalidatePath("/")
-    revalidateTag(PUBLIC_SPONSORS_TAG, "max")
+    updateTag(PUBLIC_SPONSORS_TAG)
 }
 
 export const getSponsorships = withAction(

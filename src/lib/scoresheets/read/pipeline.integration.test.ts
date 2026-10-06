@@ -23,7 +23,7 @@ import { loadScoreSheetNight } from "../load"
 import { sheetTag, TEMPLATE_VERSION } from "../sheet-config"
 import { cropId } from "./crops"
 import { processScoreSheet } from "./pipeline"
-import { labelConfirmedSamples } from "./samples"
+import { confirmReadsForMatches, labelConfirmedSamples } from "./samples"
 import { distort, toJpeg } from "./testing/distort"
 import { type GameTruth, synthesizeSheet } from "./testing/synthesize"
 import { stubTranscriber } from "./transcriber/stub"
@@ -338,6 +338,36 @@ describe("the training corpus", () => {
         // The label follows what the league believes, not what was predicted
         expect(corrected?.predicted).toBe(25)
         expect(corrected?.confirmed).toBe(27)
+    })
+
+    it("confirms the read once its matches' scores are saved", async () => {
+        const { seasonId, matchIds } = await seedNight()
+        const scores = twoNil(matchIds[0])
+        const { scoreSheetId } = await uploadPhoto({
+            seasonId,
+            matchIds,
+            scores
+        })
+        const truth = new Map<string, number | null>(
+            scores.map((g) => [cropId(g.matchId, g.team, g.game), g.score])
+        )
+        await processScoreSheet({
+            scoreSheetId,
+            seasonId,
+            transcriber: stubTranscriber({ truth })
+        })
+        const admin = await createUser()
+
+        expect(await confirmReadsForMatches([matchIds[0]], admin.id)).toBe(1)
+        const [read] = await db
+            .select()
+            .from(scoreSheetReads)
+            .where(eq(scoreSheetReads.score_sheet_id, scoreSheetId))
+        expect(read.status).toBe("confirmed")
+        expect(read.confirmed_by).toBe(admin.id)
+
+        // Saving again leaves an already-confirmed read alone.
+        expect(await confirmReadsForMatches([matchIds[0]], admin.id)).toBe(0)
     })
 
     it("leaves a sample unlabelled until its match has a score", async () => {

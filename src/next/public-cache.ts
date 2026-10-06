@@ -12,8 +12,11 @@ import {
 // ISR-regenerated on its own hourly clock, so without a shared entry ten
 // pages meant ten database reads an hour, every hour, which kept the Neon
 // compute from scaling to zero. One tagged entry per loader serves all of
-// them; the server actions that change the rows call revalidateTag(tag,
-// "max") beside their revalidatePath calls so a change still shows at once.
+// them; the server actions that change the rows call updateTag(tag) beside
+// their revalidatePath calls, which expires the entry outright so the next
+// read (including the admin's own re-render) sees the change. updateTag only
+// works inside a server action; anything else must use revalidateTag(tag,
+// "max"), which serves the stale copy once while it refreshes.
 // Lives in src/next because src/lib must not import next/cache.
 // ---------------------------------------------------------------------------
 

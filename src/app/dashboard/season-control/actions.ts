@@ -4,7 +4,7 @@ import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { playerPicBaseUrl } from "@/config/env"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
-import { revalidatePath, revalidateTag } from "next/cache"
+import { revalidatePath, updateTag } from "next/cache"
 import { SEASON_CONFIG_TAG } from "@/next/public-cache"
 import { db } from "@/database/db"
 import {
@@ -245,7 +245,7 @@ export const advanceSeasonPhase = withAction(
             }
 
             revalidatePath("/dashboard/season-control")
-            revalidateTag(SEASON_CONFIG_TAG, "max")
+            updateTag(SEASON_CONFIG_TAG)
             revalidateCalendarFeeds()
             return ok(
                 undefined,
@@ -302,7 +302,7 @@ export const revertSeasonPhase = withAction(
             })
 
             revalidatePath("/dashboard/season-control")
-            revalidateTag(SEASON_CONFIG_TAG, "max")
+            updateTag(SEASON_CONFIG_TAG)
             revalidateCalendarFeeds()
             return ok(
                 undefined,
@@ -478,7 +478,7 @@ export const createSeason = withAction(
             // Public season surfaces that display the current season
             revalidatePath("/season-info")
             revalidatePath("/")
-            revalidateTag(SEASON_CONFIG_TAG, "max")
+            updateTag(SEASON_CONFIG_TAG)
             revalidateCalendarFeeds()
 
             return ok(

@@ -26,7 +26,10 @@ import {
     PLAYER_PICTURE_MAX_BYTES
 } from "@/lib/r2"
 import { logAuditEntry } from "@/lib/audit-log"
-import { labelConfirmedSamples } from "@/lib/scoresheets/read/samples"
+import {
+    confirmReadsForMatches,
+    labelConfirmedSamples
+} from "@/lib/scoresheets/read/samples"
 import { parseSourceToken } from "@/lib/playoff-sources"
 
 async function getEnterScoresSeasonId(): Promise<number | null> {
@@ -876,8 +879,9 @@ export async function saveScoresForDivision(
         // be labelled with what was actually saved, which is how a corpus of
         // real handwriting accumulates without anyone doing extra work. Never
         // allowed to affect the save: the scores are the point.
+        const savedMatchIds = matchScores.map((m) => m.matchId)
         try {
-            await labelConfirmedSamples(matchScores.map((m) => m.matchId))
+            await labelConfirmedSamples(savedMatchIds)
         } catch {
             // Deliberately ignored; recorded inside labelConfirmedSamples.
         }
@@ -886,6 +890,9 @@ export async function saveScoresForDivision(
             headers: await headers()
         })
         if (session) {
+            // Reads behind these matches leave the inbox's review queue.
+            await confirmReadsForMatches(savedMatchIds, session.user.id)
+
             await logAuditEntry({
                 userId: session.user.id,
                 action: "update",
