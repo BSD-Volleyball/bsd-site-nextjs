@@ -806,32 +806,16 @@ describe("spooled inbound", () => {
         )
     })
 
-    it("falls back to the public bucket during the cut-over and deletes it there", async () => {
-        // The Worker wrote this spool before it was redeployed onto the
-        // private bucket: the private lookup misses, the public one hits.
-        await createUser()
-        vi.mocked(getR2Object).mockResolvedValueOnce(null)
-        const length = spool(inboundPayload())
+    it("reads the spool only from the private bucket", async () => {
+        // The public bucket is served on pics.bumpsetdrink.com; a spool
+        // object there is never looked for, so a miss is final.
+        const response = await POST(webhookRequest(envelope()))
 
-        const response = await POST(
-            webhookRequest(envelope({ ContentLength: length }))
-        )
-
-        expect(response.status).toBe(200)
-        expect(vi.mocked(getR2Object)).toHaveBeenNthCalledWith(
-            1,
+        expect(response.status).toBe(400)
+        expect(vi.mocked(getR2Object)).toHaveBeenCalledTimes(1)
+        expect(vi.mocked(getR2Object)).toHaveBeenCalledWith(
             SPOOL_KEY,
             "private"
-        )
-        expect(vi.mocked(getR2Object)).toHaveBeenNthCalledWith(
-            2,
-            SPOOL_KEY,
-            "public"
-        )
-        expect(await db.select().from(inboundEmails)).toHaveLength(1)
-        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(
-            SPOOL_KEY,
-            "public"
         )
     })
 
