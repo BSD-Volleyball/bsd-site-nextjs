@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { addToWaitlist, createSeason, createSignup } from "@/test/factories"
+import { db } from "@/database/db"
+import { drafts, substitutions } from "@/database/schema"
+import {
+    addToWaitlist,
+    createDivision,
+    createSeason,
+    createSignup,
+    createTeam
+} from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
 import { getPlayerDetailsPublic } from "./actions"
 
@@ -102,5 +110,39 @@ describe("getPlayerDetailsPublic — contact info redaction", () => {
         const result = await getPlayerDetailsPublic(waiting.id)
 
         expect(result.status).toBe(true)
+    })
+
+    // People on a current-season roster without a signup or waitlist row: a
+    // permanent sub locked in from the waitlist (the lock-in consumes the
+    // waitlist row) and a coach who captains without signing up. Captains
+    // open their details from the team card.
+    it("serves a permanent sub and a coach captain with no signup row", async () => {
+        const season = await createSeason()
+        const division = await createDivision()
+        const coach = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            captain: coach.id,
+            division: division.id
+        })
+        const original = await createUser()
+        await createSignup({ season: season.id, player: original.id })
+        const [draft] = await db
+            .insert(drafts)
+            .values({ team: team.id, user: original.id, round: 1, overall: 1 })
+            .returning()
+        const sub = await createUser()
+        await db.insert(substitutions).values({
+            team: team.id,
+            season: season.id,
+            original_draft: draft.id,
+            original_user: original.id,
+            sub_user: sub.id,
+            performed_by: coach.id
+        })
+        await createUserWithRoles([{ role: "captain" }])
+
+        expect((await getPlayerDetailsPublic(sub.id)).status).toBe(true)
+        expect((await getPlayerDetailsPublic(coach.id)).status).toBe(true)
     })
 })

@@ -9,9 +9,13 @@ import {
     playerRatings,
     userUnavailability,
     seasonEvents,
-    waitlist
+    waitlist,
+    teams,
+    drafts,
+    substitutions,
+    matchSubstitutions
 } from "@/database/schema"
-import { and, eq, inArray, desc } from "drizzle-orm"
+import { and, eq, inArray, desc, or } from "drizzle-orm"
 import { getEventsByType, formatEventDate } from "@/lib/site-config"
 import { getSessionUserId, isCommissionerBySession } from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -242,6 +246,66 @@ export const getSignupsCsvData = withAction(
     }
 )
 
+/**
+ * On a team in `seasonId` without a signup or waitlist row: a coach who
+ * captains without signing up, a drafted player, or a permanent or one-match
+ * sub (locking in a waitlist sub consumes the waitlist row). Captains open
+ * these people's details from the team card and sub finder.
+ */
+async function onSeasonRoster(
+    playerId: string,
+    seasonId: number
+): Promise<boolean> {
+    const [captain, drafted, permanentSub, matchSub] = await Promise.all([
+        db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, seasonId),
+                    or(
+                        eq(teams.captain, playerId),
+                        eq(teams.captain2, playerId)
+                    )
+                )
+            )
+            .limit(1),
+        db
+            .select({ id: drafts.id })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .where(and(eq(teams.season, seasonId), eq(drafts.user, playerId)))
+            .limit(1),
+        db
+            .select({ id: substitutions.id })
+            .from(substitutions)
+            .where(
+                and(
+                    eq(substitutions.season, seasonId),
+                    eq(substitutions.sub_user, playerId)
+                )
+            )
+            .limit(1),
+        db
+            .select({ id: matchSubstitutions.id })
+            .from(matchSubstitutions)
+            .where(
+                and(
+                    eq(matchSubstitutions.season, seasonId),
+                    eq(matchSubstitutions.sub_user, playerId)
+                )
+            )
+            .limit(1)
+    ])
+    return (
+        captain.length +
+            drafted.length +
+            permanentSub.length +
+            matchSub.length >
+        0
+    )
+}
+
 export const getPlayerDetailsPublic = withAction(
     async (
         playerId: string
@@ -290,7 +354,10 @@ export const getPlayerDetailsPublic = withAction(
                     )
                 )
                 .limit(1)
-            if (!onWaitlist) {
+            if (
+                !onWaitlist &&
+                !(await onSeasonRoster(playerId, config.seasonId))
+            ) {
                 return fail("Player not found.")
             }
         }
