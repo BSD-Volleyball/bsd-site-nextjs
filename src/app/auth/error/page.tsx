@@ -43,11 +43,25 @@ export default async function AuthErrorPage({
                     {notLinked && (
                         <>
                             <p className="text-muted-foreground text-sm">
-                                Sign in with your email and password, or send
-                                yourself a verification link below. Once your
-                                email is verified, Google sign-in will work.
+                                If you created that account, sign in with your
+                                email and password, or send yourself a
+                                verification link below.
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                                If you did not create it, reset the password
+                                instead. That signs out whoever did, verifies
+                                your email, and Google sign-in will then work.
                             </p>
                             <SendVerificationForm />
+                            <Button
+                                asChild
+                                variant="secondary"
+                                className="w-full"
+                            >
+                                <Link href="/auth/forgot-password">
+                                    Reset password
+                                </Link>
+                            </Button>
                         </>
                     )}
                     <Button asChild variant="outline" className="w-full">

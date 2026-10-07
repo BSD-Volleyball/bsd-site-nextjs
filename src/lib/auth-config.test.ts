@@ -40,4 +40,15 @@ describe("better-auth account linking", () => {
         expect(authSource).toMatch(/sendVerificationEmail\s*:/)
         expect(authSource).toMatch(/revokeSessionsOnPasswordReset\s*:\s*true/)
     })
+
+    // Verification by someone without a session must evict whoever set the
+    // password, or a pre-registered account becomes a backdoor into the
+    // real owner's account. A password reset proves the inbox the same way
+    // a verification link does, so it marks the email verified.
+    it("claims the account for the inbox owner on verification and on reset", () => {
+        expect(authSource).toMatch(/afterEmailVerification\s*:/)
+        expect(authSource).toMatch(/evictPreVerificationCredentials\s*\(/)
+        expect(authSource).toMatch(/onPasswordReset\s*:/)
+        expect(authSource).toMatch(/markEmailVerified\s*\(/)
+    })
 })

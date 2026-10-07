@@ -4,6 +4,8 @@ import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { and, eq, ne, sql } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { auth } from "@/lib/auth"
+import { logger } from "@/lib/logger"
 import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
 
@@ -76,6 +78,27 @@ export const updateAccountProfile = withAction(
                 updatedAt: new Date()
             })
             .where(eq(users.id, session.user.id))
+
+        if (emailChanged) {
+            // The new address is unverified until its owner clicks the link,
+            // so send it now. Deliberately without this request's cookies:
+            // the cached session cookie still carries the old address, and
+            // better-auth refuses a session whose email differs from the
+            // body. Verifying in this same browser still keeps the password,
+            // because afterEmailVerification (src/lib/auth.ts) reads the
+            // clicker's session at click time.
+            try {
+                await auth.api.sendVerificationEmail({
+                    body: { email, callbackURL: "/dashboard/account" }
+                })
+            } catch (error) {
+                logger.warn("[settings] verification email failed", {
+                    userId: session.user.id,
+                    error:
+                        error instanceof Error ? error.message : String(error)
+                })
+            }
+        }
 
         await logAuditEntry({
             userId: session.user.id,

@@ -9,6 +9,10 @@ import { db } from "@/database/db"
 import * as schema from "@/database/schema"
 import { site } from "@/config/site"
 import { sendMail } from "@/lib/email/send"
+import {
+    evictPreVerificationCredentials,
+    markEmailVerified
+} from "@/lib/auth-verification"
 
 // Read lazily (first account-email send), not at module load: this module
 // is imported by every session check, and a filesystem read at import time
@@ -167,6 +171,14 @@ export const auth = betterAuth({
         // Signing in with a new password proves nothing about the inbox, so
         // a reset ends every other session (including one an attacker holds).
         revokeSessionsOnPasswordReset: true,
+        // Completing a reset proves the inbox, exactly as a verification link
+        // does, so it also verifies the address. This is the recovery path
+        // /auth/error offers when Google sign-in meets an unverified account:
+        // the reset replaces whatever password was set and ends every other
+        // session, so nobody who registered this address first keeps a way in.
+        onPasswordReset: async ({ user }) => {
+            await markEmailVerified(user.id)
+        },
         sendResetPassword: async ({ user, url }) => {
             await sendAuthEmail({
                 user,
@@ -187,9 +199,22 @@ export const auth = betterAuth({
     // verified (better-auth's default since 1.6.11; it closes OAuth
     // pre-account hijacking). Password sign-ups therefore get a verification
     // link, and /auth/error offers one to anyone the gate turns away.
+    //
+    // The link lands in the real inbox, so the clicker owns the address. If
+    // they do not already hold a session for this user they did not sign up
+    // in this browser; whoever did is evicted (sessions + password) before
+    // the clicker is signed in. Otherwise verifying an account someone else
+    // registered under your address would hand them a password into it.
     emailVerification: {
         sendOnSignUp: true,
         autoSignInAfterVerification: true,
+        afterEmailVerification: async (user, request) => {
+            const session = request
+                ? await auth.api.getSession({ headers: request.headers })
+                : null
+            if (session?.user.id === user.id) return
+            await evictPreVerificationCredentials(user.id)
+        },
         sendVerificationEmail: async ({ user, url }) => {
             await sendAuthEmail({
                 user,
@@ -197,7 +222,7 @@ export const auth = betterAuth({
                 subject: "Verify your email address",
                 heading: "Verify your email address",
                 paragraphs: [
-                    "Please confirm this is your email address by clicking the button below. Once it's verified you can also sign in with Google.",
+                    "Please confirm this is your email address by clicking the button below. Open it in the browser where you signed up to keep your password; from anywhere else you will be asked to set a new one. Once verified you can also sign in with Google.",
                     "If you didn't create an account, you can safely ignore this email."
                 ],
                 action: "Verify Email",

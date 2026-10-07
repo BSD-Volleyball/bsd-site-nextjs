@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
+import { auth } from "@/lib/auth"
 import { createUser, loginAs } from "@/test/session"
 import { type AccountProfileData, updateAccountProfile } from "./actions"
 
@@ -73,5 +74,62 @@ describe("updateAccountProfile email handling", () => {
             message: "That email address can't be used."
         })
         expect((await reload(user.id)).email).toBe(user.email)
+    })
+})
+
+describe("updateAccountProfile verification challenge", () => {
+    // The mocked auth module (setup.integration.ts) has no
+    // sendVerificationEmail; attach a spy so the call can be asserted.
+    function spyOnVerificationEmail() {
+        const spy = vi.fn(async () => ({ status: true }))
+        ;(auth.api as Record<string, unknown>).sendVerificationEmail = spy
+        return spy
+    }
+
+    it("sends a verification link to the new address when it changes", async () => {
+        const spy = spyOnVerificationEmail()
+        const user = await createUser({ emailVerified: true })
+        loginAs(user)
+
+        const result = await updateAccountProfile(
+            profile({ email: "Changed.Address@Example.test" })
+        )
+
+        expect(result.status).toBe(true)
+        expect(spy).toHaveBeenCalledTimes(1)
+        expect(spy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                body: expect.objectContaining({
+                    email: "changed.address@example.test"
+                })
+            })
+        )
+    })
+
+    it("sends nothing when the address is unchanged", async () => {
+        const spy = spyOnVerificationEmail()
+        const user = await createUser({ emailVerified: true })
+        loginAs(user)
+
+        await updateAccountProfile(profile({ email: user.email }))
+
+        expect(spy).not.toHaveBeenCalled()
+    })
+
+    it("still saves the profile when the email cannot be sent", async () => {
+        ;(auth.api as Record<string, unknown>).sendVerificationEmail = vi.fn(
+            async () => {
+                throw new Error("postmark down")
+            }
+        )
+        const user = await createUser({ emailVerified: true })
+        loginAs(user)
+
+        const result = await updateAccountProfile(
+            profile({ email: "unsendable@example.test" })
+        )
+
+        expect(result.status).toBe(true)
+        expect((await reload(user.id)).email).toBe("unsendable@example.test")
     })
 })
