@@ -87,4 +87,57 @@ describe("sanitizeInboundEmailHtml", () => {
         )
         expect(html).toContain("https://a.test/x.png")
     })
+
+    // Every way a browser can be made to fetch a remote URL on render. Each
+    // one is a tracking pixel if it survives; the control exists for exactly
+    // this (see the function's doc comment).
+    it.each([
+        ["srcset-only img", '<img srcset="https://evil.test/t.png 1x">'],
+        [
+            "picture source",
+            '<picture><source srcset="https://evil.test/t.png"><img alt=""></picture>'
+        ],
+        ["video poster", '<video poster="https://evil.test/t.png"></video>'],
+        [
+            "svg image",
+            '<svg><image href="https://evil.test/t.png" xlink:href="https://evil.test/t.png"/></svg>'
+        ],
+        ["input image", '<input type="image" src="https://evil.test/t.png">'],
+        [
+            "css background-image",
+            '<div style="background-image:url(https://evil.test/t.png)">x</div>'
+        ],
+        [
+            "css background shorthand",
+            "<div style=\"background:url('https://evil.test/t.png') no-repeat\">x</div>"
+        ],
+        [
+            "css image-set",
+            '<div style="background-image:image-set(\\"https://evil.test/t.png\\" 1x)">x</div>'
+        ]
+    ])("blocks remote fetches via %s", (_label, html) => {
+        const result = sanitizeInboundEmailHtml(html, [])
+        expect(result.html).not.toContain("evil.test")
+        expect(result.blockedImages).toBeGreaterThan(0)
+    })
+
+    it("still lets inline attachment images through", () => {
+        const { html, blockedImages } = sanitizeInboundEmailHtml(
+            '<img src="cid:sig@mail" srcset="cid:sig@mail 1x">',
+            attachments
+        )
+        expect(html).toContain("/api/email-attachments/7?inline=1")
+        expect(blockedImages).toBe(0)
+    })
+
+    it("lets remote images through when allowed", () => {
+        const { html, blockedImages } = sanitizeInboundEmailHtml(
+            '<img srcset="https://ok.test/t.png 1x"><div style="background:url(https://ok.test/b.png)">x</div>',
+            [],
+            { allowRemoteImages: true }
+        )
+        expect(html).toContain("ok.test/t.png")
+        expect(html).toContain("ok.test/b.png")
+        expect(blockedImages).toBe(0)
+    })
 })
