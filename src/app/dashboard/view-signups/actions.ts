@@ -8,14 +8,11 @@ import {
     seasons,
     playerRatings,
     userUnavailability,
-    seasonEvents
+    seasonEvents,
+    waitlist
 } from "@/database/schema"
 import { and, eq, inArray, desc } from "drizzle-orm"
-import {
-    getSeasonConfig,
-    getEventsByType,
-    formatEventDate
-} from "@/lib/site-config"
+import { getEventsByType, formatEventDate } from "@/lib/site-config"
 import { getSessionUserId, isCommissionerBySession } from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -265,6 +262,39 @@ export const getPlayerDetailsPublic = withAction(
     > => {
         await requireCaptainAccess()
 
+        // The callers (signup lists, draft watchlist, sub finder, homework
+        // forms) only ever hand out ids of people in this season, but the id
+        // arrives from the browser. Captains and court managers get the
+        // current-season roster and waitlist, nobody else; former players'
+        // self-assessments and captains' notes stay with player-lookup,
+        // which is commissioner-gated.
+        const config = await requireSeasonConfig()
+        const [inSeason] = await db
+            .select({ id: signups.id })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    eq(signups.player, playerId)
+                )
+            )
+            .limit(1)
+        if (!inSeason) {
+            const [onWaitlist] = await db
+                .select({ id: waitlist.id })
+                .from(waitlist)
+                .where(
+                    and(
+                        eq(waitlist.season, config.seasonId),
+                        eq(waitlist.user, playerId)
+                    )
+                )
+                .limit(1)
+            if (!onWaitlist) {
+                return fail("Player not found.")
+            }
+        }
+
         const [userData] = await db
             .select({
                 id: users.id,
@@ -314,7 +344,6 @@ export const getPlayerDetailsPublic = withAction(
             updatedAt: new Date(0)
         }
 
-        const config = await getSeasonConfig()
         const viewerUserId = await getSessionUserId()
         const ratingsSection = await getPlayerRatingsSectionData(
             playerId,

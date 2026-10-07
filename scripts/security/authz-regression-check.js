@@ -143,6 +143,12 @@ const strictExpectations = [
         pattern: /is not on this date in the current season/,
         description:
             "must pin every match id to the current season and the edited date"
+    },
+    {
+        key: "src/app/dashboard/view-signups/actions.ts:getPlayerDetailsPublic",
+        pattern: /eq\(signups\.season,\s*config\.seasonId\)/,
+        description:
+            "must restrict the target to a current-season signup or waitlist member"
     }
 ]
 

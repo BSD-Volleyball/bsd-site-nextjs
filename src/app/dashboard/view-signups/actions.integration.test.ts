@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { createSeason } from "@/test/factories"
+import { addToWaitlist, createSeason, createSignup } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
 import { getPlayerDetailsPublic } from "./actions"
 
@@ -7,16 +7,18 @@ import { getPlayerDetailsPublic } from "./actions"
 // commissioners; captains and court managers share this action but must keep
 // receiving the redacted sentinels.
 describe("getPlayerDetailsPublic — contact info redaction", () => {
-    async function seedPlayer() {
-        return createUser({
+    async function seedPlayer(seasonId: number) {
+        const player = await createUser({
             phone: "555-123-4567",
             emergency_contact: "Jane Doe 555-999-0000"
         })
+        await createSignup({ season: seasonId, player: player.id })
+        return player
     }
 
     it("returns phone and email to a current-season commissioner", async () => {
         const season = await createSeason()
-        const player = await seedPlayer()
+        const player = await seedPlayer(season.id)
         await createUserWithRoles([
             { role: "commissioner", seasonId: season.id }
         ])
@@ -33,8 +35,8 @@ describe("getPlayerDetailsPublic — contact info redaction", () => {
     })
 
     it("keeps phone and email redacted for a captain", async () => {
-        await createSeason()
-        const player = await seedPlayer()
+        const season = await createSeason()
+        const player = await seedPlayer(season.id)
         await createUserWithRoles([{ role: "captain" }])
 
         const result = await getPlayerDetailsPublic(player.id)
@@ -46,8 +48,8 @@ describe("getPlayerDetailsPublic — contact info redaction", () => {
     })
 
     it("keeps phone and email redacted for a court manager", async () => {
-        await createSeason()
-        const player = await seedPlayer()
+        const season = await createSeason()
+        const player = await seedPlayer(season.id)
         await createUserWithRoles([{ role: "court_manager" }])
 
         const result = await getPlayerDetailsPublic(player.id)
@@ -59,8 +61,8 @@ describe("getPlayerDetailsPublic — contact info redaction", () => {
     })
 
     it("rejects an authenticated user with no captain-pages access", async () => {
-        await createSeason()
-        const player = await seedPlayer()
+        const season = await createSeason()
+        const player = await seedPlayer(season.id)
         await createUserWithRoles([{ role: "referee" }])
 
         const result = await getPlayerDetailsPublic(player.id)
@@ -68,11 +70,37 @@ describe("getPlayerDetailsPublic — contact info redaction", () => {
     })
 
     it("rejects unauthenticated callers", async () => {
-        await createSeason()
-        const player = await seedPlayer()
+        const season = await createSeason()
+        const player = await seedPlayer(season.id)
         logout()
 
         const result = await getPlayerDetailsPublic(player.id)
         expect(result.status).toBe(false)
+    })
+
+    it("refuses a player who is not in the current season", async () => {
+        const oldSeason = await createSeason()
+        await createSeason()
+        const formerPlayer = await createUser()
+        await createSignup({ season: oldSeason.id, player: formerPlayer.id })
+        await createUserWithRoles([{ role: "captain" }])
+
+        const result = await getPlayerDetailsPublic(formerPlayer.id)
+
+        expect(result.status).toBe(false)
+        expect(result.status === false && result.message).toBe(
+            "Player not found."
+        )
+    })
+
+    it("serves a current-season waitlist member (sub-finder candidates)", async () => {
+        const season = await createSeason()
+        const waiting = await createUser()
+        await addToWaitlist({ season: season.id, user: waiting.id })
+        await createUserWithRoles([{ role: "captain" }])
+
+        const result = await getPlayerDetailsPublic(waiting.id)
+
+        expect(result.status).toBe(true)
     })
 })
