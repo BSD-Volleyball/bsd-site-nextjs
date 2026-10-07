@@ -118,6 +118,15 @@ export const getDraftInitData = withAction(
         requirePositiveInt(seasonId, "season or division ID")
         requirePositiveInt(divisionId, "season or division ID")
 
+        // Access (hasDraftPageAccess) is computed for the current season;
+        // the season the queries run against must be the same one, or a
+        // current captain could read another season's board as a
+        // commissioner.
+        const config = await getSeasonConfig()
+        if (seasonId !== config.seasonId) {
+            return fail("Draft data is only available for the current season.")
+        }
+
         const access = await hasDraftPageAccess()
         if (!canReadDraftDivision(access, divisionId)) {
             return fail("You don't have permission to access this division.")
@@ -325,6 +334,15 @@ export const getDraftWatchlistData = withAction(
 
         requirePositiveInt(seasonId, "season or division ID")
         requirePositiveInt(divisionId, "season or division ID")
+
+        // Access (hasDraftPageAccess) is computed for the current season;
+        // the season the queries run against must be the same one, or a
+        // current captain could read another season's board as a
+        // commissioner.
+        const config = await getSeasonConfig()
+        if (seasonId !== config.seasonId) {
+            return fail("Draft data is only available for the current season.")
+        }
 
         const session = await requireSession()
         const userId = session.user.id

@@ -661,3 +661,33 @@ describe("getDraftInitData setup gate", () => {
         expect(after.data.alreadySubmitted).toBe(false)
     })
 })
+
+describe("draft-division reads — season pinning", () => {
+    it("refuses a season id other than the current season", async () => {
+        const oldSeason = await createSeason()
+        const season = await createSeason()
+        const division = await createDivision()
+        // A real current-season captain: the role row is season-scoped, so
+        // the read-access check passes and only the season pin can refuse.
+        const captain = await createUserWithRoles([
+            { role: "captain", seasonId: season.id }
+        ])
+        await createTeam({
+            season: season.id,
+            captain: captain.id,
+            division: division.id
+        })
+
+        const init = await getDraftInitData(oldSeason.id, division.id)
+        const watchlist = await getDraftWatchlistData(oldSeason.id, division.id)
+
+        expect(init.status).toBe(false)
+        expect(init.status === false && init.message).toContain(
+            "current season"
+        )
+        expect(watchlist.status).toBe(false)
+        expect(watchlist.status === false && watchlist.message).toContain(
+            "current season"
+        )
+    })
+})
