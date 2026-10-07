@@ -2,11 +2,14 @@
  * Guard in front of pics.bumpsetdrink.com, the public custom domain of the
  * R2 bucket "bsd".
  *
- * The bucket also holds objects that must never be public: inbound email
- * attachments (staff download them through 60-second presigned URLs after a
- * permission check), the raw inbound-email spool, and the score-sheet
- * handwriting corpus. Without this Worker any of those was downloadable by
- * key from the public domain, bypassing the app's authorization entirely.
+ * Objects that must never be public (inbound email attachments, the
+ * inbound-mail spool, the score-sheet handwriting corpus) live in a
+ * separate bucket with no public domain since 2026-10-07 (R2_PRIVATE_BUCKET
+ * in the app); the real control is that they are not in this bucket at
+ * all. The private-prefix routes below are kept as a tripwire for anything
+ * written under those prefixes by mistake. They are bound by literal path,
+ * so a percent-encoded slash (/inbound-spool%2F...) skips them, which is
+ * why the bucket split exists; do not rely on them for secrecy.
  *
  * Routes (wrangler.jsonc) attach this Worker to those prefixes only, plus
  * sponsor logos, so ordinary picture traffic never runs it:
