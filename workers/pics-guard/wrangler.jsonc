@@ -3,15 +3,23 @@
     "name": "bsd-pics-guard",
     "main": "src/index.ts",
     "compatibility_date": "2026-09-11",
-    // The whole host runs the Worker. Prefix-only routes were bypassable:
-    // Cloudflare matches routes on the raw URL, so "/inbound-spool%2Fkey"
-    // never matched and R2 served the private object itself (2026-10 audit).
-    // Public pictures are served by the Worker too (a Worker runs before
-    // the edge cache, so every request is an invocation; browsers keep each
-    // picture for 4 hours via cache-control).
+    // Only these prefixes run the Worker; every other picture is served by
+    // the R2 custom domain directly (no Worker invocation, no cost).
     "routes": [
         {
-            "pattern": "pics.bumpsetdrink.com/*",
+            "pattern": "pics.bumpsetdrink.com/email-attachments/*",
+            "zone_name": "bumpsetdrink.com"
+        },
+        {
+            "pattern": "pics.bumpsetdrink.com/inbound-spool/*",
+            "zone_name": "bumpsetdrink.com"
+        },
+        {
+            "pattern": "pics.bumpsetdrink.com/scoresheet-samples/*",
+            "zone_name": "bumpsetdrink.com"
+        },
+        {
+            "pattern": "pics.bumpsetdrink.com/sponsorlogos/*",
             "zone_name": "bumpsetdrink.com"
         }
     ],
