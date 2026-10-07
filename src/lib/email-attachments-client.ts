@@ -63,6 +63,21 @@ const REMOTE_MEDIA_TAGS = new Set([
     "input"
 ])
 
+/**
+ * Resolve CSS backslash escapes (`\72 ` -> "r", `\(` -> "("), for deciding
+ * whether a dropped style would have fetched something.
+ */
+function cssUnescape(value: string): string {
+    return value
+        .replace(/\\([0-9a-f]{1,6})\s?/gi, (_m, hex: string) => {
+            const code = Number.parseInt(hex, 16)
+            return code > 0 && code <= 0x10ffff
+                ? String.fromCodePoint(code)
+                : "\ufffd"
+        })
+        .replace(/\\(.)/g, "$1")
+}
+
 /** CSS that can lift content out of its box and over the app's own UI. */
 const ESCAPING_CSS = /\b(position|z-index)\s*:/i
 
@@ -94,7 +109,19 @@ export function sanitizeInboundEmailHtml(
 
     DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
         if (data.attrName === "style") {
-            if (ESCAPING_CSS.test(data.attrValue)) {
+            // CSS resolves backslash escapes inside identifiers (u\72 l( is
+            // url(, posit\69 on is position), so no text check below can be
+            // trusted on a value that has one. Mail clients do not write
+            // them; drop the whole style.
+            if (data.attrValue.includes("\\")) {
+                data.keepAttr = false
+                if (
+                    !allowRemoteImages &&
+                    CSS_URL.test(cssUnescape(data.attrValue))
+                ) {
+                    blockedImages++
+                }
+            } else if (ESCAPING_CSS.test(data.attrValue)) {
                 data.keepAttr = false
             } else if (!allowRemoteImages && CSS_URL.test(data.attrValue)) {
                 data.keepAttr = false

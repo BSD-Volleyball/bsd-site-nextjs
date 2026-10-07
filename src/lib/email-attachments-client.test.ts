@@ -140,4 +140,23 @@ describe("sanitizeInboundEmailHtml", () => {
         expect(html).toContain("ok.test/b.png")
         expect(blockedImages).toBe(0)
     })
+
+    // CSS resolves backslash escapes inside identifiers, so u\72 l( is url(
+    // and posit\69 on is position. Text matching cannot see through that.
+    it("drops inline styles that hide a remote url behind CSS escapes", () => {
+        const { html, blockedImages } = sanitizeInboundEmailHtml(
+            '<div style="background-image:u\\72 l(https://evil.test/a.png)">x</div>',
+            []
+        )
+        expect(html).not.toContain("evil.test")
+        expect(blockedImages).toBeGreaterThan(0)
+    })
+
+    it("drops inline styles that hide positioning behind CSS escapes", () => {
+        const { html } = sanitizeInboundEmailHtml(
+            '<div style="posit\\69 on:fixed;inset:0">fake login</div>',
+            []
+        )
+        expect(html).not.toContain("style=")
+    })
 })
