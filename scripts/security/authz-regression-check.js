@@ -107,6 +107,18 @@ const strictExpectations = [
         key: "src/app/dashboard/send-email/actions.ts:previewBroadcast",
         pattern: /await\s+commissionerTargetError\s*\(/,
         description: "must scope commissioner previews to their own divisions"
+    },
+    {
+        key: "src/app/dashboard/week-2-homework/actions.ts:submitWeek2Homework",
+        pattern: /must be a player on your Week 2 team/,
+        description:
+            "forced picks must be validated against the captain's week-2 roster"
+    },
+    {
+        key: "src/app/dashboard/week-2-homework/actions.ts:submitCoachWeek2Homework",
+        pattern: /is not on that team/,
+        description:
+            "forced picks must be validated against the named team's week-2 roster"
     }
 ]
 

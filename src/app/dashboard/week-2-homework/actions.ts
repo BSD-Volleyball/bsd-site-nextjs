@@ -120,7 +120,7 @@ export const submitWeek2Homework = withAction(
         const isBottomDivision = divisionInfo?.level === maxLevel
 
         const teamNonCaptainRows = await db
-            .select({ male: users.male })
+            .select({ userId: week2Rosters.user, male: users.male })
             .from(week2Rosters)
             .innerJoin(users, eq(week2Rosters.user, users.id))
             .where(
@@ -139,6 +139,58 @@ export const submitWeek2Homework = withAction(
         // player only needs to be assigned to one direction.
         const canShareNonMale =
             nonMaleCount === 1 && !isTopDivision && !isBottomDivision
+
+        // Forced picks come off the captain's own team, in the slot the UI
+        // labels; recommendations may name anyone in the Week 2 tryout. The
+        // ids arrive from the browser, so both rules are enforced here and
+        // not only by the pick lists the form renders.
+        const teamMaleIds = new Set(
+            teamNonCaptainRows
+                .filter((r) => r.male === true)
+                .map((r) => r.userId)
+        )
+        const teamNonMaleIds = new Set(
+            teamNonCaptainRows
+                .filter((r) => r.male !== true)
+                .map((r) => r.userId)
+        )
+        const forcedSlots: Array<[string, Set<string>, string]> = [
+            [input.forcedMoveUpMale, teamMaleIds, "male player to move up"],
+            [
+                input.forcedMoveUpNonMale,
+                teamNonMaleIds,
+                "non-male player to move up"
+            ],
+            [input.forcedMoveDownMale, teamMaleIds, "male player to move down"],
+            [
+                input.forcedMoveDownNonMale,
+                teamNonMaleIds,
+                "non-male player to move down"
+            ]
+        ]
+        for (const [pick, allowed, label] of forcedSlots) {
+            if (pick && !allowed.has(pick)) {
+                return fail(
+                    `The ${label} must be a player on your Week 2 team.`
+                )
+            }
+        }
+
+        const tryoutRows = await db
+            .select({ userId: week2Rosters.user })
+            .from(week2Rosters)
+            .where(eq(week2Rosters.season, config.seasonId))
+        const tryoutIds = new Set(tryoutRows.map((r) => r.userId))
+        for (const userId of [
+            ...input.recommendedMoveUp,
+            ...input.recommendedMoveDown
+        ]) {
+            if (userId && !tryoutIds.has(userId)) {
+                return fail(
+                    "Recommendations must name players in the Week 2 tryout."
+                )
+            }
+        }
 
         if (!isTopDivision) {
             if (!input.forcedMoveUpMale) {
@@ -311,29 +363,64 @@ export const submitCoachWeek2Homework = withAction(
         const minLevel = Math.min(...levels)
         const isTopDivision = divisionInfo?.level === minLevel
 
-        if (!isTopDivision) {
-            const divisionTeamNumbers = await db
-                .selectDistinct({ teamNumber: week2Rosters.team_number })
-                .from(week2Rosters)
-                .where(
-                    and(
-                        eq(week2Rosters.season, config.seasonId),
-                        eq(week2Rosters.division, coachTeamEntry.divisionId)
-                    )
+        const divisionRoster = await db
+            .select({
+                userId: week2Rosters.user,
+                teamNumber: week2Rosters.team_number
+            })
+            .from(week2Rosters)
+            .where(
+                and(
+                    eq(week2Rosters.season, config.seasonId),
+                    eq(week2Rosters.division, coachTeamEntry.divisionId)
                 )
+            )
+        const teamByUser = new Map(
+            divisionRoster.map((r) => [r.userId, r.teamNumber])
+        )
+        const divisionTeamNumbers = [
+            ...new Set(divisionRoster.map((r) => r.teamNumber))
+        ]
 
+        if (!isTopDivision) {
             const providedTeamNumbers = new Set(
                 input.forcedMoveUpByTeam
                     .filter((f) => f.playerId)
                     .map((f) => f.teamNumber)
             )
 
-            for (const { teamNumber } of divisionTeamNumbers) {
+            for (const teamNumber of divisionTeamNumbers) {
                 if (!providedTeamNumbers.has(teamNumber)) {
                     return fail(
                         `Please select a player to move up from Team ${formatTryoutTeamLabel(divisionInfo?.name ?? "", teamNumber)}`
                     )
                 }
+            }
+
+            // The player named for a team must actually be on that team in
+            // this division; the ids come from the browser.
+            for (const { teamNumber, playerId } of input.forcedMoveUpByTeam) {
+                if (playerId && teamByUser.get(playerId) !== teamNumber) {
+                    return fail(
+                        `The player chosen for Team ${formatTryoutTeamLabel(divisionInfo?.name ?? "", teamNumber)} is not on that team.`
+                    )
+                }
+            }
+        }
+
+        const tryoutRows = await db
+            .select({ userId: week2Rosters.user })
+            .from(week2Rosters)
+            .where(eq(week2Rosters.season, config.seasonId))
+        const tryoutIds = new Set(tryoutRows.map((r) => r.userId))
+        for (const userId of [
+            ...input.recommendedMoveUp,
+            ...input.recommendedMoveDown
+        ]) {
+            if (userId && !tryoutIds.has(userId)) {
+                return fail(
+                    "Recommendations must name players in the Week 2 tryout."
+                )
             }
         }
 
