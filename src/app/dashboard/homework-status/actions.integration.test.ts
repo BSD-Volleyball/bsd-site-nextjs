@@ -209,4 +209,28 @@ describe("homework-status detail actions — commissioner division scope", () =>
 
         expect(result.status).toBe(false)
     })
+
+    // One user can captain in two divisions in a season (a coaches division
+    // and a regular one). A commissioner scoped to either may read them.
+    it("lets a scoped commissioner read a captain who also captains elsewhere", async () => {
+        const { season, divAA, divA } = await seedCaptainsInTwoDivisions()
+        const twoTeamCaptain = await createUser()
+        await createTeam({
+            season: season.id,
+            captain: twoTeamCaptain.id,
+            division: divAA.id
+        })
+        await createTeam({
+            season: season.id,
+            captain: twoTeamCaptain.id,
+            division: divA.id
+        })
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id, divisionId: divA.id }
+        ])
+
+        const result = await getMovingDayDetail(twoTeamCaptain.id, season.id)
+
+        expect(result.status).toBe(true)
+    })
 })

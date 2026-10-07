@@ -23,16 +23,17 @@ import {
 import { commissionerCanWriteDivision } from "@/lib/rbac"
 
 /**
- * The division a captain's team sits in for `seasonId`, or null when they
- * have no team that season. Captains hold a `teams` row (captain or
- * captain2) from the moment select-captains runs, so this resolves for
- * every phase the homework pages cover.
+ * The divisions a captain's teams sit in for `seasonId` (empty when they
+ * have no team that season), lowest id first. Captains hold a `teams` row
+ * (captain or captain2) from the moment select-captains runs, so this
+ * resolves for every phase the homework pages cover. One user may captain in
+ * two divisions (a coaches division and a regular one).
  */
-async function resolveCaptainDivision(
+async function resolveCaptainDivisions(
     captainId: string,
     seasonId: number
-): Promise<number | null> {
-    const [team] = await db
+): Promise<number[]> {
+    const rows = await db
         .select({ divisionId: teams.division })
         .from(teams)
         .where(
@@ -41,31 +42,31 @@ async function resolveCaptainDivision(
                 or(eq(teams.captain, captainId), eq(teams.captain2, captainId))
             )
         )
-        .limit(1)
-    return team?.divisionId ?? null
+    return [...new Set(rows.map((r) => r.divisionId))].sort((x, y) => x - y)
 }
 
 /**
  * Admins and league-wide commissioners may read any captain; a commissioner
- * scoped to one division only their own. The page's loader (data.ts) hides
- * other divisions, but these detail actions take the captain id from the
- * browser, so the same scope is enforced here, for the requested season.
- * Returns the captain's division id.
+ * scoped to one division only captains with a team there. The page's loader
+ * (data.ts) hides other divisions, but these detail actions take the captain
+ * id from the browser, so the same scope is enforced here, for the requested
+ * season. Returns the first of the captain's divisions the caller may read.
  */
 async function requireCaptainInScope(
     userId: string,
     captainId: string,
     seasonId: number
 ): Promise<ActionResult<number>> {
-    const divisionId = await resolveCaptainDivision(captainId, seasonId)
-    if (divisionId === null) return fail("Captain not found in this season.")
-    const allowed = await commissionerCanWriteDivision(
-        userId,
-        seasonId,
-        divisionId
-    )
-    if (!allowed) return fail("Unauthorized")
-    return ok(divisionId)
+    const divisionIds = await resolveCaptainDivisions(captainId, seasonId)
+    if (divisionIds.length === 0) {
+        return fail("Captain not found in this season.")
+    }
+    for (const divisionId of divisionIds) {
+        if (await commissionerCanWriteDivision(userId, seasonId, divisionId)) {
+            return ok(divisionId)
+        }
+    }
+    return fail("Unauthorized")
 }
 
 export interface RatedPlayer {
