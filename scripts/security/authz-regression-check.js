@@ -119,6 +119,24 @@ const strictExpectations = [
         pattern: /is not on that team/,
         description:
             "forced picks must be validated against the named team's week-2 roster"
+    },
+    {
+        key: "src/app/dashboard/homework-status/actions.ts:getRatePlayersDetail",
+        pattern: /requireCaptainInScope\s*\(/,
+        description:
+            "must scope the captain to the commissioner's division via requireCaptainInScope"
+    },
+    {
+        key: "src/app/dashboard/homework-status/actions.ts:getMovingDayDetail",
+        pattern: /requireCaptainInScope\s*\(/,
+        description:
+            "must scope the captain to the commissioner's division via requireCaptainInScope"
+    },
+    {
+        key: "src/app/dashboard/homework-status/actions.ts:getDraftHomeworkDetail",
+        pattern: /requireCaptainInScope\s*\(/,
+        description:
+            "must scope the captain to the commissioner's division via requireCaptainInScope"
     }
 ]
 

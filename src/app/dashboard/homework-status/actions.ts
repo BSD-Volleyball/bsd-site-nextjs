@@ -17,9 +17,56 @@ import {
     fail,
     ok,
     requirePositiveInt,
+    requireSession,
     withAction
 } from "@/next/action-helpers"
-import { isCommissionerBySession } from "@/next/session"
+import { commissionerCanWriteDivision } from "@/lib/rbac"
+
+/**
+ * The division a captain's team sits in for `seasonId`, or null when they
+ * have no team that season. Captains hold a `teams` row (captain or
+ * captain2) from the moment select-captains runs, so this resolves for
+ * every phase the homework pages cover.
+ */
+async function resolveCaptainDivision(
+    captainId: string,
+    seasonId: number
+): Promise<number | null> {
+    const [team] = await db
+        .select({ divisionId: teams.division })
+        .from(teams)
+        .where(
+            and(
+                eq(teams.season, seasonId),
+                or(eq(teams.captain, captainId), eq(teams.captain2, captainId))
+            )
+        )
+        .limit(1)
+    return team?.divisionId ?? null
+}
+
+/**
+ * Admins and league-wide commissioners may read any captain; a commissioner
+ * scoped to one division only their own. The page's loader (data.ts) hides
+ * other divisions, but these detail actions take the captain id from the
+ * browser, so the same scope is enforced here, for the requested season.
+ * Returns the captain's division id.
+ */
+async function requireCaptainInScope(
+    userId: string,
+    captainId: string,
+    seasonId: number
+): Promise<ActionResult<number>> {
+    const divisionId = await resolveCaptainDivision(captainId, seasonId)
+    if (divisionId === null) return fail("Captain not found in this season.")
+    const allowed = await commissionerCanWriteDivision(
+        userId,
+        seasonId,
+        divisionId
+    )
+    if (!allowed) return fail("Unauthorized")
+    return ok(divisionId)
+}
 
 export interface RatedPlayer {
     playerId: string
@@ -51,12 +98,14 @@ export const getRatePlayersDetail = withAction(
         captainId: string,
         seasonId: number
     ): Promise<ActionResult<RatePlayersDetailData>> => {
-        const hasAccess = await isCommissionerBySession()
-        if (!hasAccess) {
-            return fail("Unauthorized")
-        }
-
+        const session = await requireSession()
         requirePositiveInt(seasonId, "season")
+        const scope = await requireCaptainInScope(
+            session.user.id,
+            captainId,
+            seasonId
+        )
+        if (!scope.status) return scope
 
         const ratings = await db
             .select({ player: playerRatings.player })
@@ -105,12 +154,14 @@ export const getMovingDayDetail = withAction(
         captainId: string,
         seasonId: number
     ): Promise<ActionResult<MovingDayDetailData>> => {
-        const hasAccess = await isCommissionerBySession()
-        if (!hasAccess) {
-            return fail("Unauthorized")
-        }
-
+        const session = await requireSession()
         requirePositiveInt(seasonId, "season")
+        const scope = await requireCaptainInScope(
+            session.user.id,
+            captainId,
+            seasonId
+        )
+        if (!scope.status) return scope
 
         const entries = await db
             .select({
@@ -219,37 +270,16 @@ export const getDraftHomeworkDetail = withAction(
         captainId: string,
         seasonId: number
     ): Promise<ActionResult<DraftHomeworkDetailData>> => {
-        const hasAccess = await isCommissionerBySession()
-        if (!hasAccess) {
-            return fail("Unauthorized")
-        }
-
+        const session = await requireSession()
         requirePositiveInt(seasonId, "season")
+        const scope = await requireCaptainInScope(
+            session.user.id,
+            captainId,
+            seasonId
+        )
+        if (!scope.status) return scope
 
-        // 1. Look up captain's team to find divisionId
-        const captainTeams = await db
-            .select({
-                divisionId: teams.division,
-                captain: teams.captain,
-                captain2: teams.captain2
-            })
-            .from(teams)
-            .where(
-                and(
-                    eq(teams.season, seasonId),
-                    or(
-                        eq(teams.captain, captainId),
-                        eq(teams.captain2, captainId)
-                    )
-                )
-            )
-            .limit(1)
-
-        if (captainTeams.length === 0) {
-            return fail("Captain not found in this season.")
-        }
-
-        const divisionId = captainTeams[0].divisionId
+        const divisionId = scope.data
 
         // 2. Fetch division config (genderSplit, numTeams) and division name
         const [divConfig] = await db

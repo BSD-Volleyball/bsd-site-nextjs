@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import { individual_divisions, movingDay } from "@/database/schema"
 import { createDivision, createSeason, createTeam } from "@/test/factories"
-import { createUser, createUserWithRoles } from "@/test/session"
+import { createUser, createUserWithRoles, logout } from "@/test/session"
+import {
+    getDraftHomeworkDetail,
+    getMovingDayDetail,
+    getRatePlayersDetail
+} from "./actions"
 import { getHomeworkStatusData } from "./data"
 
 // Seeds a season with a top division (AA, level 1) and a lower division
@@ -123,5 +128,85 @@ describe("getHomeworkStatusData moving-day completion", () => {
             (c) => c.captainId === captainA.id
         )
         expect(captainStatus?.movingDayComplete).toBe(true)
+    })
+})
+
+describe("homework-status detail actions — commissioner division scope", () => {
+    async function seedCaptainsInTwoDivisions() {
+        const { season, divAA, divA, captainAA, captainA } =
+            await seedTwoDivisionSeason()
+        const player = await createUser()
+        await db.insert(movingDay).values({
+            season: season.id,
+            submitted_by: captainAA.id,
+            player: player.id,
+            direction: "down",
+            is_forced: true
+        })
+        return { season, divAA, divA, captainAA, captainA }
+    }
+
+    it("lets a division-scoped commissioner read their own division's captain", async () => {
+        const { season, divAA, captainAA } = await seedCaptainsInTwoDivisions()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id, divisionId: divAA.id }
+        ])
+
+        const result = await getMovingDayDetail(captainAA.id, season.id)
+
+        expect(result.status).toBe(true)
+        expect(result.status && result.data.forcedDown).toHaveLength(1)
+    })
+
+    it("refuses a division-scoped commissioner reading another division's captain", async () => {
+        const { season, divA, captainAA } = await seedCaptainsInTwoDivisions()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id, divisionId: divA.id }
+        ])
+
+        const moving = await getMovingDayDetail(captainAA.id, season.id)
+        const rate = await getRatePlayersDetail(captainAA.id, season.id)
+        const draft = await getDraftHomeworkDetail(captainAA.id, season.id)
+
+        for (const result of [moving, rate, draft]) {
+            expect(result.status).toBe(false)
+            expect(result.status === false && result.message).toBe(
+                "Unauthorized"
+            )
+        }
+    })
+
+    it("refuses a commissioner of a different season", async () => {
+        const { season, divAA, captainAA } = await seedCaptainsInTwoDivisions()
+        const otherSeason = await createSeason()
+        await createUserWithRoles([
+            {
+                role: "commissioner",
+                seasonId: otherSeason.id,
+                divisionId: divAA.id
+            }
+        ])
+
+        const result = await getMovingDayDetail(captainAA.id, season.id)
+
+        expect(result.status).toBe(false)
+    })
+
+    it("lets an admin read any captain", async () => {
+        const { season, captainA } = await seedCaptainsInTwoDivisions()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getMovingDayDetail(captainA.id, season.id)
+
+        expect(result.status).toBe(true)
+    })
+
+    it("refuses when signed out", async () => {
+        const { season, captainA } = await seedCaptainsInTwoDivisions()
+        logout()
+
+        const result = await getMovingDayDetail(captainA.id, season.id)
+
+        expect(result.status).toBe(false)
     })
 })
