@@ -106,4 +106,22 @@ describe("serializeCsvField", () => {
         expect(serializeCsvField('say "hi"')).toBe('"say ""hi"""')
         expect(serializeCsvField("line1\nline2")).toBe('"line1\nline2"')
     })
+
+    // Spreadsheets evaluate a cell that starts with = + - @ (and tab/CR
+    // variants) as a formula. These fields hold player-typed text.
+    it("neutralises formula prefixes with a leading apostrophe", () => {
+        expect(serializeCsvField('=HYPERLINK("https://x","y")')).toBe(
+            '"\'=HYPERLINK(""https://x"",""y"")"'
+        )
+        expect(serializeCsvField("+1 555")).toBe('"\'+1 555"')
+        expect(serializeCsvField("-5")).toBe('"\'-5"')
+        expect(serializeCsvField("@mention")).toBe('"\'@mention"')
+        expect(serializeCsvField("\t=cmd")).toBe('"\'\t=cmd"')
+    })
+
+    it("leaves negative numbers alone when they arrive as numbers", () => {
+        // Only strings a player could have typed are escaped; numeric
+        // columns (ids, amounts) keep their sign.
+        expect(serializeCsvField(-5)).toBe("-5")
+    })
 })

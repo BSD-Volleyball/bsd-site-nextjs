@@ -107,9 +107,24 @@ export function buildPlayerPictureUrl(
 // CSV helpers
 // ---------------------------------------------------------------------------
 
+/** Leading characters a spreadsheet treats as the start of a formula. */
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/
+
+/**
+ * One CSV cell. Quotes when the value contains a delimiter, quote or line
+ * break, and prefixes an apostrophe when a *string* starts with a formula
+ * trigger: these exports carry player-typed text (names, pair reasons,
+ * survey answers) that admins open in Excel, where `=HYPERLINK(...)` would
+ * otherwise run. Numbers are serialised as given so numeric columns keep
+ * their sign.
+ */
 export function serializeCsvField(value: unknown): string {
     if (value == null) return ""
-    const str = String(value)
+    let str = String(value)
+    if (typeof value === "string" && CSV_FORMULA_PREFIX.test(str)) {
+        str = `'${str}`
+        return `"${str.replace(/"/g, '""')}"`
+    }
     if (/[",\n\r]/.test(str)) {
         return `"${str.replace(/"/g, '""')}"`
     }
