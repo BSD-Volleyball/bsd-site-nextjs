@@ -6,6 +6,7 @@ import {
     S3Client
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { type R2Scope, resolveR2Bucket } from "@/lib/r2-bucket"
 import { requireEnv } from "@/lib/utils"
 
 const R2_REGION = "auto"
@@ -27,8 +28,12 @@ function getR2SecretAccessKey(): string {
     return requireEnv("R2_SECRET_ACCESS_KEY")
 }
 
-function getR2Bucket(): string {
-    return requireEnv("R2_BUCKET")
+function getR2Bucket(scope: R2Scope): string {
+    return resolveR2Bucket(scope, {
+        R2_BUCKET: process.env.R2_BUCKET,
+        R2_PRIVATE_BUCKET: process.env.R2_PRIVATE_BUCKET,
+        NODE_ENV: process.env.NODE_ENV
+    })
 }
 
 let cachedClient: S3Client | null = null
@@ -60,7 +65,8 @@ export async function createPlayerPictureUploadPresignedUrl(params: {
     contentLength: number
     maxContentLength?: number
 }): Promise<string> {
-    const bucket = getR2Bucket()
+    // Browser uploads are only ever public pictures and sponsor logos.
+    const bucket = getR2Bucket("public")
 
     const max = params.maxContentLength ?? PLAYER_PICTURE_MAX_BYTES
     if (
@@ -92,8 +98,11 @@ export async function createPlayerPictureUploadPresignedUrl(params: {
     })
 }
 
-export async function deleteR2Object(key: string): Promise<void> {
-    const bucket = getR2Bucket()
+export async function deleteR2Object(
+    key: string,
+    scope: R2Scope = "public"
+): Promise<void> {
+    const bucket = getR2Bucket(scope)
 
     const command = new DeleteObjectCommand({
         Bucket: bucket,
@@ -112,9 +121,10 @@ export async function putR2Object(params: {
     key: string
     body: Buffer
     contentType: string
+    scope?: R2Scope
 }): Promise<void> {
     const command = new PutObjectCommand({
-        Bucket: getR2Bucket(),
+        Bucket: getR2Bucket(params.scope ?? "public"),
         Key: params.key,
         Body: params.body,
         ContentType: params.contentType,
@@ -129,6 +139,8 @@ export async function putR2Object(params: {
  * from R2 directly, so an attachment of any size never has to fit through a
  * Vercel function response. The Content-Type/Disposition overrides are
  * signed into the URL, so R2 serves exactly what the app decided.
+ * Attachments live in the private bucket; the presigned URL is the only way
+ * a browser ever reaches one.
  */
 export async function createAttachmentDownloadPresignedUrl(params: {
     key: string
@@ -136,7 +148,7 @@ export async function createAttachmentDownloadPresignedUrl(params: {
     contentDisposition: string
 }): Promise<string> {
     const command = new GetObjectCommand({
-        Bucket: getR2Bucket(),
+        Bucket: getR2Bucket("private"),
         Key: params.key,
         ResponseContentType: params.contentType,
         ResponseContentDisposition: params.contentDisposition,
@@ -155,8 +167,14 @@ interface R2ObjectStream {
 }
 
 /** Fetch an object as a web stream, or null when the key doesn't exist. */
-export async function getR2Object(key: string): Promise<R2ObjectStream | null> {
-    const command = new GetObjectCommand({ Bucket: getR2Bucket(), Key: key })
+export async function getR2Object(
+    key: string,
+    scope: R2Scope = "public"
+): Promise<R2ObjectStream | null> {
+    const command = new GetObjectCommand({
+        Bucket: getR2Bucket(scope),
+        Key: key
+    })
 
     try {
         const result = await getR2Client().send(command)

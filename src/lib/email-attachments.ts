@@ -87,7 +87,8 @@ async function uploadOne(
         await putR2Object({
             key: prepared.key,
             body: prepared.body,
-            contentType: prepared.contentType
+            contentType: prepared.contentType,
+            scope: "private"
         })
         return prepared
     } catch (error) {

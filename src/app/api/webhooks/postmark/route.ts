@@ -16,6 +16,7 @@ import {
 } from "@/lib/inbound/postmark-payloads"
 import { parseSpooledEnvelope } from "@/lib/inbound/spool-envelope"
 import { deleteR2Object, getR2Object } from "@/lib/r2"
+import type { R2Scope } from "@/lib/r2-bucket"
 
 // HTTP concerns only: credentials, payload parsing, the spool fetch/delete,
 // dispatch by RecordType and the response. Inbound-mail processing lives in
@@ -108,7 +109,17 @@ async function handleSpooledInbound(
     }
     const { SpoolKey: spoolKey, ContentLength: contentLength } = envelope
 
-    const object = await getR2Object(spoolKey)
+    // The inbound Worker writes the spool to the private bucket. During the
+    // cut-over (app deployed, Worker not yet redeployed) an object may still
+    // land in the public bucket, so look there second and delete from
+    // wherever it was found. Remove the fallback once the Worker is on the
+    // private bucket and the public inbound-spool/ prefix is empty.
+    let scope: R2Scope = "private"
+    let object = await getR2Object(spoolKey, scope)
+    if (!object) {
+        scope = "public"
+        object = await getR2Object(spoolKey, scope)
+    }
     if (!object) {
         logger.error("[postmark-webhook] Spool object missing", { spoolKey })
         return NextResponse.json({ error: "Spool missing" }, { status: 400 })
@@ -152,7 +163,7 @@ async function handleSpooledInbound(
     }
 
     try {
-        await deleteR2Object(spoolKey)
+        await deleteR2Object(spoolKey, scope)
     } catch (error) {
         // Lifecycle expiry cleans it up; never fail a processed message here.
         logger.warn("[postmark-webhook] Could not delete spool object", {

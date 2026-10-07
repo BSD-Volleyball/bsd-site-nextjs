@@ -172,7 +172,7 @@ Common environment variables used across the app include:
 - `MAIL_FROM`
 - `NEXT_PUBLIC_APP_URL`
 - `PLAYER_PIC_URL`
-- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (Cloudflare R2 via the S3 API: player pictures, inbound email attachments, the inbound-email spool)
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (the public bucket behind `pics.bumpsetdrink.com`: player/team/score-sheet pictures, sponsor logos), `R2_PRIVATE_BUCKET` (no public domain: inbound email attachments, the inbound-email spool, the score-sheet sample corpus; required in production, falls back to `R2_BUCKET` elsewhere)
 - `INBOUND_CONCERN_ADDRESS` (inbound mail to this address becomes a concern instead of an admin email ticket)
 - `AI_GATEWAY_API_KEY` (reading handwritten scores off photographed sheets, through Vercel AI Gateway). Optional overrides: `SCORESHEET_MODEL` (a Gateway slug from `https://ai-gateway.vercel.sh/v1/models`, default `google/gemini-3-flash`), `SCORESHEET_MODEL_API_KEY` and `SCORESHEET_MODEL_BASE_URL` for pointing at a different OpenAI-compatible endpoint. With no key the reader still identifies the sheet and counts the WIN ticks, so local dev, CI and e2e need nothing set
 - `SQUARE_ACCESS_TOKEN`

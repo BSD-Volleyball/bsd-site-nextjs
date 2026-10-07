@@ -72,7 +72,8 @@ export async function storeScoreSamples(
             await putR2Object({
                 key,
                 body: Buffer.from(crop.png),
-                contentType: "image/png"
+                contentType: "image/png",
+                scope: "private"
             })
             rows.push({
                 read_id: readId,

@@ -604,6 +604,8 @@ describe("inbound attachments", () => {
         expect(firstUpload.contentType).toBe("image/png")
         expect(Buffer.compare(firstUpload.body, PNG_BYTES)).toBe(0)
         expect(firstUpload.key).toBe(rows[0].r2_key)
+        // Attachments never go to the public picture bucket.
+        expect(firstUpload.scope).toBe("private")
     })
 
     it("attaches files on a thread reply to the received message", async () => {
@@ -777,7 +779,10 @@ describe("spooled inbound", () => {
         )
 
         expect(response.status).toBe(200)
-        expect(vi.mocked(getR2Object)).toHaveBeenCalledWith(SPOOL_KEY)
+        expect(vi.mocked(getR2Object)).toHaveBeenCalledWith(
+            SPOOL_KEY,
+            "private"
+        )
         const tickets = await db.select().from(inboundEmails)
         expect(tickets).toHaveLength(1)
         expect(tickets[0]).toMatchObject({
@@ -793,9 +798,41 @@ describe("spooled inbound", () => {
             size_bytes: FILE_BYTES.length
         })
         expect(vi.mocked(putR2Object)).toHaveBeenCalledWith(
-            expect.objectContaining({ body: FILE_BYTES })
+            expect.objectContaining({ body: FILE_BYTES, scope: "private" })
         )
-        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(SPOOL_KEY)
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(
+            SPOOL_KEY,
+            "private"
+        )
+    })
+
+    it("falls back to the public bucket during the cut-over and deletes it there", async () => {
+        // The Worker wrote this spool before it was redeployed onto the
+        // private bucket: the private lookup misses, the public one hits.
+        await createUser()
+        vi.mocked(getR2Object).mockResolvedValueOnce(null)
+        const length = spool(inboundPayload())
+
+        const response = await POST(
+            webhookRequest(envelope({ ContentLength: length }))
+        )
+
+        expect(response.status).toBe(200)
+        expect(vi.mocked(getR2Object)).toHaveBeenNthCalledWith(
+            1,
+            SPOOL_KEY,
+            "private"
+        )
+        expect(vi.mocked(getR2Object)).toHaveBeenNthCalledWith(
+            2,
+            SPOOL_KEY,
+            "public"
+        )
+        expect(await db.select().from(inboundEmails)).toHaveLength(1)
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(
+            SPOOL_KEY,
+            "public"
+        )
     })
 
     it("still requires the webhook credentials", async () => {
@@ -891,8 +928,14 @@ describe("spooled inbound", () => {
         expect(response.status).toBe(200)
         expect(await db.select().from(inboundEmails)).toHaveLength(1)
         expect(await db.select().from(emailAttachments)).toHaveLength(1)
-        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(SPOOL_KEY)
-        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(otherKey)
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(
+            SPOOL_KEY,
+            "private"
+        )
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(
+            otherKey,
+            "private"
+        )
     })
 })
 
