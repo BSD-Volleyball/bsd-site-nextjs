@@ -8,7 +8,9 @@
     // record). The Worker spools each POST into R2 and hands the Vercel app
     // only the object key, sidestepping Vercel's 4.5 MB request-body cap.
     "routes": [{ "pattern": "hooks.bumpsetdrink.com", "custom_domain": true }],
-    "r2_buckets": [{ "binding": "SPOOL_BUCKET", "bucket_name": "bsd" }],
+    // The spool holds complete raw emails; it lives in the private bucket
+    // (no public domain), not in `bsd` behind pics.bumpsetdrink.com.
+    "r2_buckets": [{ "binding": "SPOOL_BUCKET", "bucket_name": "bsd-private" }],
     // The app's Vercel-owned hostname, NOT www.bumpsetdrink.com: a Worker's
     // fetch() to a hostname on its own zone is routed through the zone's
     // SSL/TLS mode, and in the default "Flexible" mode that hop is plain HTTP,
