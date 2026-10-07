@@ -43,12 +43,36 @@ export async function evictPreVerificationCredentials(
 }
 
 /**
+ * The afterEmailVerification decision. `verifierUserId` is the user the
+ * clicker's browser is signed in as (null when signed out). Only someone
+ * already signed in as this user is the person who signed up there and keeps
+ * the password; any other click evicts. Returns whether it evicted.
+ */
+export async function claimOnVerification(
+    userId: string,
+    verifierUserId: string | null
+): Promise<boolean> {
+    if (verifierUserId === userId) return false
+    await evictPreVerificationCredentials(userId)
+    return true
+}
+
+/**
  * A password-reset link is delivered to the same inbox a verification link
  * is, so completing a reset proves ownership of the address just as well.
+ *
+ * better-auth keys a reset token by user id, not by the address it was
+ * mailed to, so the row's address may have changed since. `email` is the
+ * address the reset completed against (the user row better-auth loaded);
+ * the update only applies while the row still holds it. Settings also
+ * revokes outstanding reset tokens when the address changes.
  */
-export async function markEmailVerified(userId: string): Promise<void> {
+export async function markEmailVerified(
+    userId: string,
+    email: string
+): Promise<void> {
     await db
         .update(users)
         .set({ emailVerified: true, updatedAt: new Date() })
-        .where(eq(users.id, userId))
+        .where(and(eq(users.id, userId), eq(users.email, email)))
 }

@@ -4,6 +4,7 @@ import { db } from "@/database/db"
 import { accounts, sessions, users } from "@/database/schema"
 import { createUser } from "@/test/session"
 import {
+    claimOnVerification,
     evictPreVerificationCredentials,
     markEmailVerified
 } from "./auth-verification"
@@ -102,12 +103,84 @@ describe("markEmailVerified", () => {
     it("flips emailVerified to true", async () => {
         const user = await createUser({ emailVerified: false })
 
-        await markEmailVerified(user.id)
+        await markEmailVerified(user.id, user.email)
 
         const [row] = await db
             .select({ emailVerified: users.emailVerified })
             .from(users)
             .where(eq(users.id, user.id))
         expect(row.emailVerified).toBe(true)
+    })
+
+    // The reset token is keyed by user id, so the address on the row may have
+    // changed since the reset ran; only the address the reset saw is verified.
+    it("does nothing when the address has changed since the reset", async () => {
+        const user = await createUser({ emailVerified: false })
+
+        await markEmailVerified(user.id, "old-address@example.test")
+
+        const [row] = await db
+            .select({ emailVerified: users.emailVerified })
+            .from(users)
+            .where(eq(users.id, user.id))
+        expect(row.emailVerified).toBe(false)
+    })
+})
+
+// The decision afterEmailVerification (src/lib/auth.ts) makes with the
+// clicker's session: the person who signed up in this browser keeps their
+// password; anyone else's click evicts whoever set it.
+describe("claimOnVerification", () => {
+    async function remaining(userId: string) {
+        return {
+            sessions: (
+                await db
+                    .select()
+                    .from(sessions)
+                    .where(eq(sessions.userId, userId))
+            ).length,
+            accounts: (
+                await db
+                    .select()
+                    .from(accounts)
+                    .where(eq(accounts.userId, userId))
+            ).length
+        }
+    }
+
+    it("keeps everything when the clicker is signed in as that user", async () => {
+        const user = await createUser({ emailVerified: false })
+        await seedCredentialAccount(user.id)
+        await seedSession(user.id)
+
+        expect(await claimOnVerification(user.id, user.id)).toBe(false)
+        expect(await remaining(user.id)).toEqual({ sessions: 1, accounts: 1 })
+    })
+
+    it("evicts when the clicker is signed in as someone else", async () => {
+        const user = await createUser({ emailVerified: false })
+        const other = await createUser()
+        await seedCredentialAccount(user.id)
+        await seedSession(user.id)
+
+        expect(await claimOnVerification(user.id, other.id)).toBe(true)
+        expect(await remaining(user.id)).toEqual({ sessions: 0, accounts: 0 })
+    })
+
+    it("evicts when the clicker has no session", async () => {
+        const user = await createUser({ emailVerified: false })
+        await seedCredentialAccount(user.id)
+        await seedSession(user.id)
+
+        expect(await claimOnVerification(user.id, null)).toBe(true)
+        expect(await remaining(user.id)).toEqual({ sessions: 0, accounts: 0 })
+    })
+
+    it("is a no-op for a Google-only user with no password", async () => {
+        const user = await createUser({ emailVerified: false })
+        await seedGoogleAccount(user.id)
+
+        await expect(claimOnVerification(user.id, null)).resolves.toBe(true)
+        expect(await remaining(user.id)).toEqual({ sessions: 0, accounts: 1 })
     })
 })

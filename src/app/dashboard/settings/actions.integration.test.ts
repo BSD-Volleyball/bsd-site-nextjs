@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
-import { eq } from "drizzle-orm"
+import { eq, like } from "drizzle-orm"
 import { db } from "@/database/db"
-import { users } from "@/database/schema"
+import { users, verifications } from "@/database/schema"
 import { auth } from "@/lib/auth"
 import { createUser, loginAs } from "@/test/session"
 import { type AccountProfileData, updateAccountProfile } from "./actions"
@@ -131,5 +131,55 @@ describe("updateAccountProfile verification challenge", () => {
 
         expect(result.status).toBe(true)
         expect((await reload(user.id)).email).toBe("unsendable@example.test")
+    })
+})
+
+// better-auth keys a reset token by user id, not by the address it was mailed
+// to, and completing a reset marks the email verified (src/lib/auth.ts). A
+// token requested for the old address must therefore die when the address
+// changes, or its holder could verify an address they never received mail at.
+describe("updateAccountProfile password-reset tokens", () => {
+    async function seedResetToken(userId: string) {
+        const token = crypto.randomUUID()
+        await db.insert(verifications).values({
+            id: crypto.randomUUID(),
+            identifier: `reset-password:${token}`,
+            value: userId,
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000)
+        })
+    }
+
+    async function resetTokensFor(userId: string) {
+        return db
+            .select()
+            .from(verifications)
+            .where(like(verifications.identifier, "reset-password:%"))
+            .then((rows) => rows.filter((r) => r.value === userId))
+    }
+
+    it("revokes outstanding reset tokens when the address changes", async () => {
+        const user = await createUser({ emailVerified: true })
+        const bystander = await createUser()
+        await seedResetToken(user.id)
+        await seedResetToken(bystander.id)
+        loginAs(user)
+
+        const result = await updateAccountProfile(
+            profile({ email: "victim@example.test" })
+        )
+
+        expect(result.status).toBe(true)
+        expect(await resetTokensFor(user.id)).toHaveLength(0)
+        expect(await resetTokensFor(bystander.id)).toHaveLength(1)
+    })
+
+    it("keeps reset tokens when the address is unchanged", async () => {
+        const user = await createUser({ emailVerified: true })
+        await seedResetToken(user.id)
+        loginAs(user)
+
+        await updateAccountProfile(profile({ email: user.email }))
+
+        expect(await resetTokensFor(user.id)).toHaveLength(1)
     })
 })

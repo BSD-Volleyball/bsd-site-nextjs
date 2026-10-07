@@ -9,10 +9,7 @@ import { db } from "@/database/db"
 import * as schema from "@/database/schema"
 import { site } from "@/config/site"
 import { sendMail } from "@/lib/email/send"
-import {
-    evictPreVerificationCredentials,
-    markEmailVerified
-} from "@/lib/auth-verification"
+import { claimOnVerification, markEmailVerified } from "@/lib/auth-verification"
 
 // Read lazily (first account-email send), not at module load: this module
 // is imported by every session check, and a filesystem read at import time
@@ -177,7 +174,7 @@ export const auth = betterAuth({
         // the reset replaces whatever password was set and ends every other
         // session, so nobody who registered this address first keeps a way in.
         onPasswordReset: async ({ user }) => {
-            await markEmailVerified(user.id)
+            await markEmailVerified(user.id, user.email)
         },
         sendResetPassword: async ({ user, url }) => {
             await sendAuthEmail({
@@ -212,8 +209,7 @@ export const auth = betterAuth({
             const session = request
                 ? await auth.api.getSession({ headers: request.headers })
                 : null
-            if (session?.user.id === user.id) return
-            await evictPreVerificationCredentials(user.id)
+            await claimOnVerification(user.id, session?.user.id ?? null)
         },
         sendVerificationEmail: async ({ user, url }) => {
             await sendAuthEmail({

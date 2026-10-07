@@ -47,7 +47,7 @@ describe("better-auth account linking", () => {
     // a verification link does, so it marks the email verified.
     it("claims the account for the inbox owner on verification and on reset", () => {
         expect(authSource).toMatch(/afterEmailVerification\s*:/)
-        expect(authSource).toMatch(/evictPreVerificationCredentials\s*\(/)
+        expect(authSource).toMatch(/claimOnVerification\s*\(/)
         expect(authSource).toMatch(/onPasswordReset\s*:/)
         expect(authSource).toMatch(/markEmailVerified\s*\(/)
     })

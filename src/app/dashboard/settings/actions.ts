@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/database/db"
-import { users } from "@/database/schema"
-import { and, eq, ne, sql } from "drizzle-orm"
+import { users, verifications } from "@/database/schema"
+import { and, eq, like, ne, sql } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
 import { logger } from "@/lib/logger"
@@ -60,24 +60,43 @@ export const updateAccountProfile = withAction(
         const fullName =
             `${data.first_name || ""} ${data.last_name || ""}`.trim()
 
-        await db
-            .update(users)
-            .set({
-                first_name: data.first_name || "",
-                last_name: data.last_name || "",
-                preferred_name: data.preferred_name,
-                email,
-                // A new address is unproven. Leaving it marked verified would
-                // let someone claim another person's address and have that
-                // person's Google sign-in link into this account.
-                ...(emailChanged ? { emailVerified: false } : {}),
-                phone: data.phone,
-                emergency_contact: data.emergency_contact,
-                pronouns: data.pronouns,
-                name: fullName,
-                updatedAt: new Date()
-            })
-            .where(eq(users.id, session.user.id))
+        await db.transaction(async (tx) => {
+            await tx
+                .update(users)
+                .set({
+                    first_name: data.first_name || "",
+                    last_name: data.last_name || "",
+                    preferred_name: data.preferred_name,
+                    email,
+                    // A new address is unproven. Leaving it marked verified would
+                    // let someone claim another person's address and have that
+                    // person's Google sign-in link into this account.
+                    ...(emailChanged ? { emailVerified: false } : {}),
+                    phone: data.phone,
+                    emergency_contact: data.emergency_contact,
+                    pronouns: data.pronouns,
+                    name: fullName,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, session.user.id))
+
+            if (emailChanged) {
+                // better-auth keys a reset token by user id, not by the
+                // address it was mailed to, and a completed reset marks the
+                // email verified (onPasswordReset in src/lib/auth.ts). A
+                // token requested for the old address must not survive the
+                // change, or its holder could verify an address they never
+                // received mail at.
+                await tx
+                    .delete(verifications)
+                    .where(
+                        and(
+                            like(verifications.identifier, "reset-password:%"),
+                            eq(verifications.value, session.user.id)
+                        )
+                    )
+            }
+        })
 
         if (emailChanged) {
             // The new address is unverified until its owner clicks the link,
