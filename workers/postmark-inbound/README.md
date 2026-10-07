@@ -34,8 +34,8 @@ key and the app dedupes by MessageID.
 ## First deploy / runbook
 
 1. Cloudflare account must be on **Workers Paid** (the Free plan's 10 ms CPU
-   budget is too small to stream a 50 MB body). R2 bucket `bsd` must exist
-   (it does; the app uses it via the S3 API).
+   budget is too small to stream a 50 MB body). R2 bucket `bsd-private` (no public domain) must exist
+   (it does; the app reads the spool from it via the S3 API).
 2. Secrets — the same values as the app's `POSTMARK_WEBHOOK_USER` /
    `POSTMARK_WEBHOOK_PASSWORD` on Vercel; rotate both places together:
    ```bash
@@ -45,7 +45,7 @@ key and the app dedupes by MessageID.
    ```
 3. Lifecycle rule so abandoned spool objects expire:
    ```bash
-   pnpm exec wrangler r2 bucket lifecycle add bsd --prefix inbound-spool/ --expire-days 3
+   pnpm exec wrangler r2 bucket lifecycle add bsd-private expire-inbound-spool inbound-spool/ --expire-days 3
    ```
 4. Vercel WAF: Bot Protection runs in challenge mode. A custom rule
    `path eq /api/webhooks/postmark AND method eq POST → bypass` must exist or
@@ -56,7 +56,8 @@ key and the app dedupes by MessageID.
 6. Smoke test with a Postmark-shaped JSON body (any `MessageID`/`From`/`To`)
    and the Basic credentials; expect 200, a ticket in Manage Emails, and no
    object left under `inbound-spool/`
-   (`pnpm exec wrangler r2 object list bsd --prefix inbound-spool/`).
+   (the `bsd-private` bucket in the Cloudflare dashboard; wrangler has no
+   `r2 object list`).
 7. Point Postmark at the Worker: `PUT https://api.postmarkapp.com/server`
    with `InboundHookUrl` =
    `https://<user>:<password>@hooks.bumpsetdrink.com/postmark/inbound`.
