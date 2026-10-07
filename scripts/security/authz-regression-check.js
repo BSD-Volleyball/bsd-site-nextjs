@@ -137,6 +137,12 @@ const strictExpectations = [
         pattern: /requireCaptainInScope\s*\(/,
         description:
             "must scope the captain to the commissioner's division via requireCaptainInScope"
+    },
+    {
+        key: "src/app/dashboard/schedule-refs/actions.ts:saveRefAssignments",
+        pattern: /is not on this date in the current season/,
+        description:
+            "must pin every match id to the current season and the edited date"
     }
 ]
 

@@ -821,6 +821,64 @@ export const saveRefAssignments = withAction(
             }
         }
 
+        // The payload names matches and referees by id from the browser.
+        // A season-scoped coordinator must only touch this season's matches
+        // on the night they are editing, and only assign people on this
+        // season's referee roster; otherwise past seasons' assignments (and
+        // the pay reports built from them) could be rewritten by id.
+        const matchIds = assignments
+            .map((a) => a.matchId)
+            .filter((id): id is number => typeof id === "number" && id > 0)
+        if (matchIds.length === 0) {
+            return ok(undefined, "Nothing to save.")
+        }
+        const matchRows = await db
+            .select({ id: matches.id })
+            .from(matches)
+            .where(
+                and(
+                    inArray(matches.id, matchIds),
+                    eq(matches.season, seasonId),
+                    eq(matches.date, date)
+                )
+            )
+        const validMatchIds = new Set(matchRows.map((m) => m.id))
+        const badMatch = matchIds.find((id) => !validMatchIds.has(id))
+        if (badMatch !== undefined) {
+            return fail(
+                `Match ${badMatch} is not on this date in the current season.`
+            )
+        }
+
+        const refIds = [
+            ...new Set(
+                assignments
+                    .flatMap((a) => [a.primaryRefId, a.backupRefId])
+                    .filter(
+                        (id): id is string =>
+                            typeof id === "string" && id !== ""
+                    )
+            )
+        ]
+        if (refIds.length > 0) {
+            const rosterRows = await db
+                .select({ userId: seasonRefs.user_id })
+                .from(seasonRefs)
+                .where(
+                    and(
+                        eq(seasonRefs.season_id, seasonId),
+                        inArray(seasonRefs.user_id, refIds)
+                    )
+                )
+            const roster = new Set(rosterRows.map((r) => r.userId))
+            const badRef = refIds.find((id) => !roster.has(id))
+            if (badRef !== undefined) {
+                return fail(
+                    "One of the selected referees is not on the referee roster for this season."
+                )
+            }
+        }
+
         await db.transaction(async (tx) => {
             for (const { matchId, primaryRefId, backupRefId } of assignments) {
                 if (!matchId || typeof matchId !== "number") continue
@@ -828,7 +886,12 @@ export const saveRefAssignments = withAction(
                 // Delete existing assignments for this match
                 await tx
                     .delete(matchReferees)
-                    .where(eq(matchReferees.match_id, matchId))
+                    .where(
+                        and(
+                            eq(matchReferees.match_id, matchId),
+                            eq(matchReferees.season_id, seasonId)
+                        )
+                    )
 
                 if (primaryRefId && typeof primaryRefId === "string") {
                     await tx.insert(matchReferees).values({
