@@ -75,6 +75,28 @@ describe("createVisionTranscriber", () => {
         expect(body.messages[0].content[0].text).toContain("1:home:1")
     })
 
+    it("asks the model to answer without reasoning first", async () => {
+        // A reasoning model spent 7,464 hidden tokens and 45 seconds on six
+        // boxes, against a 60-second timeout, and gave the same answers in
+        // 2.6 seconds with reasoning off. Reading two digits needs no essay.
+        const fetchImpl = reply(
+            completion(
+                JSON.stringify({
+                    readings: [
+                        { id: "1:home:1", value: 25, confidence: 0.9 },
+                        { id: "1:away:1", value: 19, confidence: 0.88 }
+                    ]
+                })
+            )
+        )
+        await make(fetchImpl).transcribe(CROPS)
+
+        const body = JSON.parse(
+            String(vi.mocked(fetchImpl).mock.calls[0][1]?.body)
+        )
+        expect(body.reasoning).toEqual({ enabled: false })
+    })
+
     it("tolerates a reply wrapped in prose or fences", async () => {
         const readings = await make(
             reply(

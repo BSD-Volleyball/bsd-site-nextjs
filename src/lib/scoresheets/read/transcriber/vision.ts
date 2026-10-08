@@ -48,6 +48,11 @@ const TIMEOUT_MS = 60_000
  * from the gym timed out at sixty seconds and lost every score on the page.
  * Split into chunks, a slow or refused chunk costs only its own boxes, and the
  * rest of the sheet still comes back.
+ *
+ * Not smaller. The slowness was the model reasoning, not the request size
+ * (see `reasoning` below), and the Gateway's free tier allows this model five
+ * requests a minute: a sheet sent one or two boxes at a time had its later
+ * requests refused outright with a 429.
  */
 const CROPS_PER_REQUEST = 6
 
@@ -168,6 +173,11 @@ export function createVisionTranscriber(config: VisionConfig): Transcriber {
                 model: config.model,
                 // Nothing creative is wanted here.
                 temperature: 0,
+                // The default model reasons before answering unless told not
+                // to. On six boxes that was 7,464 hidden tokens and 45 seconds
+                // against a 60-second timeout; with it off, 2.6 seconds and
+                // the same six answers. A model that cannot reason ignores it.
+                reasoning: { enabled: false },
                 response_format: { type: "json_object" },
                 messages: [{ role: "user", content }]
             }),
