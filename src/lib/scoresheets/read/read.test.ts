@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
+import type { BoxRect, SheetGeometry } from "../layout"
 import { cropId } from "./crops"
 import { readSheet } from "./read"
 import { distort } from "./testing/distort"
@@ -23,6 +24,10 @@ async function photograph(opts: {
     scores: GameTruth[]
     seed: number
     matchCount?: 1 | 2 | 3 | 4
+    /** Fold the page, as the first real photographs were. */
+    curl?: number
+    /** Page rectangles to paint white before photographing. */
+    whiteOut?: (geometry: SheetGeometry) => BoxRect[]
 }) {
     const sheet = await synthesizeSheet({
         matchCount: opts.matchCount ?? 3,
@@ -30,13 +35,29 @@ async function photograph(opts: {
         scale: SCALE,
         scores: opts.scores
     })
+    for (const rect of opts.whiteOut?.(sheet.geometry) ?? []) {
+        const x0 = Math.floor(rect.x * SCALE)
+        const x1 = Math.ceil((rect.x + rect.w) * SCALE)
+        for (
+            let y = Math.floor((792 - rect.y - rect.h) * SCALE);
+            y <= Math.ceil((792 - rect.y) * SCALE);
+            y++
+        ) {
+            sheet.image.gray.fill(
+                255,
+                y * sheet.image.width + x0,
+                y * sheet.image.width + x1
+            )
+        }
+    }
     const { image } = distort(sheet.image, {
         seed: opts.seed,
         perspective: 0.025,
         rotationDeg: 4,
         blurSigma: 1,
         noiseSigma: 4,
-        shading: 0.25
+        shading: 0.25,
+        curl: opts.curl
     })
     const truth = new Map<string, number | null>(
         sheet.truth.games.map((g) => [
@@ -204,6 +225,76 @@ describe("readSheet", () => {
             expect(game.blank).toBe(false)
             expect(game.level).toBe("unreadable")
         }
+    })
+
+    it("reads a sheet that was folded in half", async () => {
+        // The first folded photographs put the FINAL boxes 15-35pt from where
+        // a flat page would, so every crop read the printed tally above them.
+        const scores = MATCH_IDS.flatMap(twoNil)
+        const { image, truth } = await photograph({
+            scores,
+            seed: 106,
+            curl: 0.035
+        })
+
+        const result = await readSheet({
+            image,
+            matchIds: MATCH_IDS,
+            eventType: "regular_season",
+            transcriber: stubTranscriber({ truth })
+        })
+
+        // Identity is a separate question (the pipeline also decodes the tag
+        // from the raw photo); here no score may be in doubt.
+        expect(
+            result.problems.filter(
+                (p) => p.startsWith("Match") || p.includes("score box")
+            )
+        ).toEqual([])
+        for (const match of result.matches) {
+            expect(match.games.map((g) => [g.home, g.away, g.blank])).toEqual([
+                [25, 19, false],
+                [25, 21, false],
+                [null, null, true]
+            ])
+        }
+    })
+
+    it("calls a game unreadable, not blank, when its boxes cannot be found", async () => {
+        // Nothing printed is left where the game's boxes were. That is not
+        // an unplayed game: an unplayed game still has its empty boxes.
+        const scores = MATCH_IDS.flatMap(twoNil)
+        const { image, truth } = await photograph({
+            scores,
+            seed: 107,
+            curl: 0.02,
+            whiteOut: (geometry) =>
+                geometry.games
+                    .filter((g) => g.matchId === 901 && g.game === 1)
+                    .map((g) => ({
+                        x: g.finalDigits[0].x - 3,
+                        y: g.finalDigits[0].y - 3,
+                        w: g.win.x + g.win.w - g.finalDigits[0].x + 6,
+                        h: g.finalDigits[0].h + 6
+                    }))
+        })
+
+        const result = await readSheet({
+            image,
+            matchIds: MATCH_IDS,
+            eventType: "regular_season",
+            transcriber: stubTranscriber({ truth })
+        })
+
+        const game = result.matches[1].games[0]
+        expect(game.blank).toBe(false)
+        expect(game.level).toBe("unreadable")
+        expect(result.status).toBe("needs_review")
+        // The rest of the sheet is unaffected
+        expect(result.matches[0].games[0]).toMatchObject({
+            home: 25,
+            away: 19
+        })
     })
 
     it("reports a photo it cannot place instead of guessing", async () => {

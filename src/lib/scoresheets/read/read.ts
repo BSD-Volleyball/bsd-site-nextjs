@@ -12,7 +12,7 @@
 
 import { buildSheetGeometry, type SheetGeometry } from "../layout"
 import type { CourtSheet, SheetEventType, SheetMatch } from "../types"
-import { readCheckbox } from "./checkbox"
+import { type CheckReading, readCheckbox } from "./checkbox"
 import { cropId, cropScoreBoxes, type ScoreCrop } from "./crops"
 import { readSheetTag, type SheetTagParts } from "./identity"
 import type { RasterImage } from "./image"
@@ -24,6 +24,7 @@ import {
     reconcileMatch,
     type ScoreCandidate
 } from "./reconcile"
+import { refineGameBoxes } from "./refine"
 import { gameConstraint } from "./rules"
 import { validateReadings } from "./transcriber/port"
 import type { Transcriber } from "./transcriber/port"
@@ -94,7 +95,7 @@ export function geometryForPrint(
 }
 
 export async function readSheet(input: ReadInput): Promise<SheetRead> {
-    const geometry = geometryForPrint(input.matchIds, input.eventType)
+    const printed = geometryForPrint(input.matchIds, input.eventType)
 
     const transform = locatePage(input.image)
     if (!transform) {
@@ -119,7 +120,16 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
     }
     const problems: string[] = []
 
-    const identity = readSheetTag(input.image, transform, geometry.tagQr)
+    const identity = readSheetTag(input.image, transform, printed.tagQr)
+
+    // The page fit is exact at the corner marks and only there; a folded or
+    // curled page puts its boxes elsewhere. Find each game's boxes by their
+    // printed outlines before reading anything inside them.
+    const { geometry, unlocated, uncheckedWins } = refineGameBoxes(
+        input.image,
+        transform.toImage,
+        printed
+    )
     if (!identity) {
         problems.push(
             "The sheet's code could not be read, so which court this is must be confirmed by hand."
@@ -128,10 +138,16 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
 
     // Ink first, then the transcriber. A box we believe is empty is never
     // shown to a model, so an empty game cannot acquire a score.
+    const located = {
+        ...geometry,
+        games: geometry.games.filter(
+            (g) => !unlocated.has(cropId(g.matchId, g.team, g.game))
+        )
+    }
     const { written, blank } = cropScoreBoxes(
         input.image,
         transform.toImage,
-        geometry,
+        located,
         input.eventType
     )
 
@@ -193,7 +209,12 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
                 if (blankIds.has(id)) return null
                 return candidates.get(id) ?? { value: null, confidence: 0 }
             }
-            const tick = (team: "home" | "away") => {
+            const tick = (team: "home" | "away"): CheckReading => {
+                // A box we could not find tells us nothing either way.
+                const id = cropId(matchId, team, game)
+                if (unlocated.has(id) || uncheckedWins.has(id)) {
+                    return { inkRatio: 0, state: "ambiguous", confidence: 0 }
+                }
                 const box = geometry.games.find(
                     (g) =>
                         g.matchId === matchId &&
@@ -227,6 +248,11 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
         for (const problem of match.problems) {
             problems.push(`Match ${match.orderOnCourt}: ${problem}`)
         }
+    }
+    if (unlocated.size > 0) {
+        problems.push(
+            `${unlocated.size} score box${unlocated.size === 1 ? " was" : "es were"} not where the sheet prints them, so ${unlocated.size === 1 ? "it was" : "they were"} not read. A sheet photographed flat on a table, unfolded, reads best.`
+        )
     }
     if (transform.residualPt > 3) {
         problems.push(

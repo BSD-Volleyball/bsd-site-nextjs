@@ -118,6 +118,31 @@ describe("synthesized sheets", () => {
     })
 })
 
+describe("synthesized tally", () => {
+    it("prints the point numbers that crowd the FINAL boxes", async () => {
+        // On paper the tally sits a couple of points above the FINAL boxes.
+        // A reader that misjudges where the boxes are reads these instead,
+        // so a harness without them cannot catch that mistake.
+        const sheet = await synthesizeSheet({
+            matchCount: 3,
+            eventType: "regular_season",
+            scale: NEW_SCALE
+        })
+        const tally = sheet.geometry.games[0].tally
+        let dark = 0
+        let total = 0
+        for (let y = tally.y; y < tally.y + tally.h; y += 0.25) {
+            for (let x = tally.x; x < tally.x + tally.w; x += 0.25) {
+                const px = Math.round(x * sheet.scale)
+                const py = Math.round((792 - y) * sheet.scale)
+                if (sheet.image.gray[py * sheet.image.width + px] < 128) dark++
+                total++
+            }
+        }
+        expect(dark / total).toBeGreaterThan(0.03)
+    })
+})
+
 describe("distortion", () => {
     it("keeps the tag readable through a realistic photo", async () => {
         const sheet = await synthesizeSheet({
@@ -147,5 +172,77 @@ describe("distortion", () => {
         const a = distort(sheet.image, { seed: 3, perspective: 0.04 })
         const b = distort(sheet.image, { seed: 3, perspective: 0.04 })
         expect(a.image.gray).toEqual(b.image.gray)
+    })
+
+    it("bends the middle of a folded page but not its corners", async () => {
+        // A sheet folded in half and photographed on a lap: the marks stay
+        // where a flat page would put them, the middle does not. This is the
+        // shape the first real folded photographs had.
+        const sheet = await synthesizeSheet({
+            matchCount: 3,
+            eventType: "regular_season",
+            scale: 1
+        })
+        const flat = distort(sheet.image, { seed: 5, perspective: 0.02 })
+        const folded = distort(sheet.image, {
+            seed: 5,
+            perspective: 0.02,
+            curl: 0.035
+        })
+
+        const moved = (x: number, y: number) => {
+            const a = flat.truthPoint({ x, y })
+            const b = folded.truthPoint({ x, y })
+            return Math.hypot(a.x - b.x, a.y - b.y)
+        }
+        const w = sheet.image.width
+        const h = sheet.image.height
+
+        for (const [x, y] of [
+            [0, 0],
+            [w, 0],
+            [w, h],
+            [0, h]
+        ]) {
+            expect(moved(x, y)).toBeLessThan(0.5)
+        }
+        // A FINAL box in the first match sits about a third of the way down
+        expect(moved(w * 0.42, h * 0.34)).toBeGreaterThan(12)
+    })
+
+    it("draws content where truthPoint says it went", async () => {
+        const sheet = await synthesizeSheet({
+            matchCount: 3,
+            eventType: "regular_season",
+            scale: 2
+        })
+        const { image, truthPoint } = distort(sheet.image, {
+            seed: 9,
+            perspective: 0.02,
+            curl: 0.035
+        })
+        const fiducialCentre = (index: number) => {
+            const f = sheet.geometry.fiducials[index]
+            return {
+                x: (f.x + f.w / 2) * sheet.scale,
+                y: (792 - f.y - f.h / 2) * sheet.scale
+            }
+        }
+        // A solid printed mark must still be ink where it is said to be
+        for (let i = 0; i < 4; i++) {
+            const p = truthPoint(fiducialCentre(i))
+            const v =
+                image.gray[Math.round(p.y) * image.width + Math.round(p.x)]
+            expect(v).toBeLessThan(60)
+        }
+        // And so must a FINAL box border in the bent middle of the page
+        const box = sheet.geometry.games[0].finalDigits[0]
+        const edge = truthPoint({
+            x: box.x * sheet.scale,
+            y: (792 - box.y - box.h / 2) * sheet.scale
+        })
+        const v =
+            image.gray[Math.round(edge.y) * image.width + Math.round(edge.x)]
+        expect(v).toBeLessThan(120)
     })
 })

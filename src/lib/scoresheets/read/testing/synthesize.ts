@@ -18,6 +18,7 @@ import QRCode from "qrcode"
 import {
     type BoxRect,
     buildSheetGeometry,
+    type GameGeometry,
     PAGE_HEIGHT,
     PAGE_WIDTH,
     type SheetGeometry
@@ -157,6 +158,53 @@ function drawDigit(canvas: Canvas, digit: number, box: BoxRect, jitter = 0) {
         if (seg === "tr") line(right, mid, right, top)
         if (seg === "bl") line(left, bottom, left, mid)
         if (seg === "br") line(right, bottom, right, mid)
+    }
+}
+
+/**
+ * A printed tally number, about the size of the real 7pt type. Thinner and
+ * smaller than handwriting, but it is ink right above the FINAL boxes, which
+ * is the point: it is what a reader reads if it looks in slightly the wrong
+ * place.
+ */
+function drawPrintedNumber(canvas: Canvas, n: number, cell: BoxRect) {
+    const digits = String(n).split("").map(Number)
+    const glyphW = 3
+    const glyphH = 5
+    const gap = 0.8
+    const totalW = digits.length * glyphW + (digits.length - 1) * gap
+    let left = cell.x + (cell.w - totalW) / 2
+    const bottom = cell.y + (cell.h - glyphH) / 2
+    const top = bottom + glyphH
+    const mid = (bottom + top) / 2
+
+    for (const digit of digits) {
+        const right = left + glyphW
+        const line = (ax: number, ay: number, bx: number, by: number) =>
+            drawLine(canvas, { x: ax, y: ay }, { x: bx, y: by }, 0.6)
+        for (const seg of SEGMENTS[digit] ?? []) {
+            if (seg === "top") line(left, top, right, top)
+            if (seg === "middle") line(left, mid, right, mid)
+            if (seg === "bottom") line(left, bottom, right, bottom)
+            if (seg === "tl") line(left, mid, left, top)
+            if (seg === "tr") line(right, mid, right, top)
+            if (seg === "bl") line(left, bottom, left, mid)
+            if (seg === "br") line(right, bottom, right, mid)
+        }
+        left = right + gap
+    }
+}
+
+function drawTally(canvas: Canvas, tally: GameGeometry["tally"]) {
+    for (let point = 1; point <= tally.maxPoint; point++) {
+        const row = Math.floor((point - 1) / tally.perRow)
+        const col = (point - 1) % tally.perRow
+        drawPrintedNumber(canvas, point, {
+            x: tally.x + col * tally.cellWidth,
+            y: tally.y + tally.h - (row + 1) * tally.rowHeight,
+            w: tally.cellWidth,
+            h: tally.rowHeight
+        })
     }
 }
 
@@ -305,6 +353,7 @@ export async function synthesizeSheet(
         const score = want?.score ?? null
         const win = want?.win ?? false
 
+        drawTally(canvas, game.tally)
         for (const box of game.finalDigits) strokeRect(canvas, box, 1.1)
         strokeRect(canvas, game.win, 0.9)
         for (const box of game.timeouts) strokeRect(canvas, box, 0.7)

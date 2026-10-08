@@ -6,7 +6,7 @@
 
 import { encode as encodeJpeg } from "jpeg-js"
 
-import { applyH, invertH, solveHomography } from "../homography"
+import { applyH, invertH, type Point, solveHomography } from "../homography"
 import { type RasterImage, sampleBilinear } from "../image"
 
 /** Small deterministic PRNG; Math.random would make failures unrepeatable. */
@@ -31,6 +31,41 @@ interface DistortOptions {
     resample?: number
     /** Pad around the page, as a fraction, so it is not flush to the edge. */
     margin?: number
+    /**
+     * Bend the page as if it were folded in half and photographed resting on
+     * a lap: the corners stay put and the middle sinks away from the camera,
+     * so content there lands closer to the centre than a flat page would put
+     * it. The value is the largest displacement, as a fraction of the page's
+     * size; 0.035 is about the 20-30pt seen on the first folded photographs.
+     */
+    curl?: number
+}
+
+/**
+ * For a point where a flat page would be, the point of the clean page that a
+ * curled one actually shows there. Zero at all four corners and pointing
+ * outward, because the middle of the page sinks away from the camera and so
+ * shows more of the page in less of the frame.
+ *
+ * Shaped like the folded photographs. The crease runs across the page, so each
+ * horizontal line is pinched evenly towards the centre, hardest at the crease
+ * (`1 - |2v - 1|`): paper does not stretch along a line that stays straight.
+ * The sag down the page is strongest a quarter of the way in from top and
+ * bottom and a little weaker towards the side edges, which is what slopes the
+ * rows.
+ */
+function curlOffset(p: Point, width: number, height: number, amount: number) {
+    const u = p.x / width
+    const v = p.y / height
+    const crease = 1 - Math.abs(2 * v - 1)
+    return {
+        x: amount * width * (2 * u - 1) * crease,
+        y:
+            -amount *
+            height *
+            Math.sin(2 * Math.PI * v) *
+            (0.5 + 0.5 * Math.sin(Math.PI * u))
+    }
 }
 
 /**
@@ -41,7 +76,11 @@ interface DistortOptions {
 export function distort(
     img: RasterImage,
     opts: DistortOptions
-): { image: RasterImage; truthToImage: ReturnType<typeof solveHomography> } {
+): {
+    image: RasterImage
+    /** Where a pixel of the clean sheet ended up in the photo. */
+    truthPoint: (clean: Point) => Point
+} {
     const rand = seededRandom(opts.seed)
     const margin = opts.margin ?? 0.08
     const outW = Math.round(img.width * (1 + margin * 2) * (opts.resample ?? 1))
@@ -86,10 +125,29 @@ export function distort(
     const backward = invertH(forward)
     if (!backward) throw new Error("non-invertible distortion")
 
+    const curl = opts.curl ?? 0
+    // Flat position -> the clean point a curled page shows there.
+    const bend = (q: Point): Point => {
+        if (curl === 0) return q
+        const d = curlOffset(q, img.width, img.height, curl)
+        return { x: q.x + d.x, y: q.y + d.y }
+    }
+    // Its inverse, by fixed-point iteration: the offset is small and smooth,
+    // so this converges in a handful of steps.
+    const unbend = (p: Point): Point => {
+        if (curl === 0) return p
+        let q = p
+        for (let i = 0; i < 30; i++) {
+            const d = curlOffset(q, img.width, img.height, curl)
+            q = { x: p.x - d.x, y: p.y - d.y }
+        }
+        return q
+    }
+
     const gray = new Uint8Array(outW * outH).fill(255)
     for (let y = 0; y < outH; y++) {
         for (let x = 0; x < outW; x++) {
-            const p = applyH(backward, { x: x + 0.5, y: y + 0.5 })
+            const p = bend(applyH(backward, { x: x + 0.5, y: y + 0.5 }))
             if (
                 !Number.isFinite(p.x) ||
                 p.x < 0 ||
@@ -110,7 +168,10 @@ export function distort(
     if (opts.blurSigma) out = blur(out, opts.blurSigma)
     if (opts.noiseSigma) out = addNoise(out, opts.noiseSigma, rand)
 
-    return { image: out, truthToImage: forward }
+    return {
+        image: out,
+        truthPoint: (clean) => applyH(forward, unbend(clean))
+    }
 }
 
 /** A soft off-centre darkening, the shape overhead gym lighting makes. */
