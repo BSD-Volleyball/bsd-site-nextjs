@@ -97,8 +97,11 @@ export function InterruptionsSection() {
                             to BSD. If the team is left with fewer than 5
                             players able to play, they may request an
                             &ldquo;exceptional sub&rdquo;, requiring approval of
-                            all captains at the facility and the division
-                            commissioner.
+                            a majority of captains at the facility and the
+                            division commissioner or other available BSD Board
+                            Member. A BSD Board Member may also approve an
+                            exceptional sub without requiring approval of any
+                            captains.
                         </p>
                     </div>
                 </div>
