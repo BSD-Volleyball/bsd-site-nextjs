@@ -14,7 +14,11 @@ import { buildSheetGeometry, type SheetGeometry } from "../layout"
 import type { CourtSheet, SheetEventType, SheetMatch } from "../types"
 import { type CheckReading, readCheckbox } from "./checkbox"
 import { cropId, cropScoreBoxes, type ScoreCrop } from "./crops"
-import { readSheetTag, type SheetTagParts } from "./identity"
+import {
+    type IdentityResult,
+    readSheetTag,
+    type SheetTagParts
+} from "./identity"
 import type { RasterImage } from "./image"
 import { locatePage, type PageTransform } from "./locate"
 import {
@@ -66,6 +70,14 @@ interface ReadInput {
     eventType: SheetEventType
     transcriber: Transcriber
     signal?: AbortSignal
+    /**
+     * The tag as already decoded from the raw photo, used when the rectified
+     * page will not give it up. On real photos the raw decode is the more
+     * reliable of the two (6/6 against 4/6 on 2026-10-08), and the caller
+     * chose `matchIds` from it, so discarding it would file a correctly read
+     * sheet as "court unknown".
+     */
+    photoTag?: IdentityResult | null
 }
 
 /**
@@ -120,7 +132,10 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
     }
     const problems: string[] = []
 
-    const identity = readSheetTag(input.image, transform, printed.tagQr)
+    const identity =
+        readSheetTag(input.image, transform, printed.tagQr) ??
+        input.photoTag ??
+        null
 
     // The page fit is exact at the corner marks and only there; a folded or
     // curled page puts its boxes elsewhere. Find each game's boxes by their

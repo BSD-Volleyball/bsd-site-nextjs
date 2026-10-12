@@ -19,7 +19,7 @@ import { findScoreSheetPrint, type ScoreSheetPrint } from "../prints"
 import { loadScoreSheetNight } from "../load"
 import type { SheetEventType } from "../types"
 import { decodeJpeg } from "./image"
-import { readSheetTagFromPhoto } from "./identity"
+import { type IdentityResult, readSheetTagFromPhoto } from "./identity"
 import { readSheet, type SheetRead } from "./read"
 import { storeScoreSamples } from "./samples"
 import type { Transcriber } from "./transcriber/port"
@@ -99,6 +99,7 @@ async function resolveLayout(
     eventType: SheetEventType
     print: ScoreSheetPrint | null
     reconstructed: boolean
+    photoTag: IdentityResult | null
 } | null> {
     const fromPhoto = readSheetTagFromPhoto(decodeJpeg(photo))
     if (fromPhoto) {
@@ -108,7 +109,8 @@ async function resolveLayout(
                 matchIds: print.matchIds,
                 eventType: print.eventType,
                 print,
-                reconstructed: false
+                reconstructed: false,
+                photoTag: fromPhoto
             }
         }
     }
@@ -124,7 +126,8 @@ async function resolveLayout(
         matchIds: sheet.matches.map((m) => m.matchId),
         eventType: night.eventType,
         print: null,
-        reconstructed: true
+        reconstructed: true,
+        photoTag: fromPhoto
     }
 }
 
@@ -187,6 +190,7 @@ export async function processScoreSheet(
             image: decodeJpeg(bytes),
             matchIds: layout.matchIds,
             eventType: layout.eventType,
+            photoTag: layout.photoTag,
             transcriber:
                 opts.transcriber ?? transcriberFromEnv() ?? nullTranscriber
         })

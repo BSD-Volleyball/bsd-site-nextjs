@@ -65,7 +65,7 @@ function decode(img: RasterImage): string | null {
     return result?.data ?? null
 }
 
-interface IdentityResult {
+export interface IdentityResult {
     text: string
     parts: SheetTagParts
 }

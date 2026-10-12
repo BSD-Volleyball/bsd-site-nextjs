@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { BoxRect, SheetGeometry } from "../layout"
 import { cropId } from "./crops"
+import { parseSheetTag } from "./identity"
 import { readSheet } from "./read"
 import { distort } from "./testing/distort"
 import { type GameTruth, synthesizeSheet } from "./testing/synthesize"
@@ -258,6 +259,37 @@ describe("readSheet", () => {
                 [null, null, true]
             ])
         }
+    })
+
+    it("keeps the identity the pipeline already read from the raw photo", async () => {
+        // On 2026-10-08 the tag decoded from all six raw photos but from only
+        // four rectified pages, and the other two were filed "Court unknown"
+        // although their scores had been read against the right matches.
+        const scores = twoNil(900)
+        const { image, sheet } = await photograph({
+            scores,
+            seed: 107,
+            whiteOut: (geometry) => [geometry.tagQr]
+        })
+        const photoTag = {
+            text: sheet.truth.tag,
+            parts: parseSheetTag(sheet.truth.tag)!
+        }
+        const input = {
+            image,
+            matchIds: MATCH_IDS,
+            eventType: "regular_season" as const,
+            transcriber: nullTranscriber
+        }
+
+        const alone = await readSheet(input)
+        expect(alone.status).toBe("unidentified")
+
+        const told = await readSheet({ ...input, photoTag })
+        expect(told.status).not.toBe("unidentified")
+        expect(told.tag).toBe(sheet.truth.tag)
+        expect(told.identity?.court).toBe(photoTag.parts.court)
+        expect(told.problems.join(" ")).not.toContain("code could not be read")
     })
 
     it("calls a game unreadable, not blank, when its boxes cannot be found", async () => {

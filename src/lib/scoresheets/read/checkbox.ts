@@ -28,9 +28,20 @@ export interface CheckReading {
 
 /** Fraction of the box ignored on each side, to clear the printed border. */
 const INSET = 0.25
-/** Below this the box is empty; above the upper bound it is definitely marked. */
-const LOWER = 0.1
-const UPPER = 0.28
+/**
+ * Below this the box is empty; above the upper bound it is definitely marked.
+ *
+ * Measured, not guessed. On the 2026-10-08 photographs every empty WIN box
+ * read 0.00-0.04 and 47 of 51 ticks read 0.14 or more: a pen tick is a
+ * couple of thin strokes, often mostly outside the box, so it moves the mean
+ * far less than a synthetic one. The old 0.10/0.28 band left 14 real ticks
+ * "ambiguous", which is how a misread 25-22 reached the form as 25-27 at high
+ * confidence with nothing to contradict it. The worst synthetic empty box
+ * (folded, blurred, shaded; 16 seeds) reads 0.054. Re-measure on real
+ * photos, every WIN box against the known winner, before moving either.
+ */
+const LOWER = 0.06
+const UPPER = 0.12
 
 export function readCheckbox(
     img: RasterImage,
