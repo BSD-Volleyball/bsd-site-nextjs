@@ -89,9 +89,14 @@ export function ruleLines(eventType: SheetEventType): string[] {
  * How to fill the sheet. Printed in bold above the match blocks because the
  * FINAL boxes and the WIN tick are new, and between them are everything a
  * reader will later parse.
+ *
+ * "Write the FINAL score, one digit per box" was read on 2026-10-08 by two
+ * referees of six as "our score | their score", so each team's row held both
+ * numbers and no reader could tell them apart. Hence the definition and the
+ * worked example. One line only: the rules box has no room for a second.
  */
 export const FILL_INSTRUCTION =
-    "Slash each point as scored. After each game write the FINAL score, one digit per box, and tick WIN for the winner."
+    "Slash each point as scored. FINAL = that team's OWN score, one digit per box (25 = 2|5). Tick WIN for the winner."
 
 /** "fall" + 2026 -> "F26". */
 export function seasonCodeFor(seasonName: string, year: number): string {
