@@ -217,6 +217,13 @@ export function OverallInformationSection() {
                         anyone is available to substitute, all attempts should
                         be made to play the match as scheduled.
                     </p>
+                    <p className="mt-2">
+                        <strong>PLAYOFF MATCHES ONLY:</strong> The Division
+                        Commissioner, or in their absence, a BSD Board Member
+                        must be consulted before any playoff game is forfeited.
+                        The Division Commissioner or Board Member also has the
+                        discretion to modify the timing of any grace periods.
+                    </p>
                 </div>
 
                 <div>

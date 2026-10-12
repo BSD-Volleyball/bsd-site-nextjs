@@ -66,10 +66,15 @@ export function PlayoffsSection() {
                         </li>
                         <li>
                             If a team finds out at match time or during the
-                            match that they will have to play with a hole, the
-                            captain may seek an exceptional sub. That substitute
-                            player should be approved by all captains currently
-                            at the facility AND the division commissioner.
+                            match that they will have to play with a hole or
+                            forfeit the match, the captain may seek an
+                            exceptional sub. That substitute player should be
+                            approved by a majority of captains currently at the
+                            facility AND the division commissioner or other
+                            available BSD Board Member. However, a BSD Board
+                            Member may approve an exceptional sub without
+                            requiring approval of any Captains after considering
+                            all available options.
                         </li>
                     </ul>
                 </div>
