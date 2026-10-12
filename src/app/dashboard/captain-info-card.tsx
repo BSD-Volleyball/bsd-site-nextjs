@@ -41,6 +41,7 @@ import {
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 import { buildEventVariableValues } from "@/lib/email-template-variables"
 import Link from "next/link"
+import { TeamNameEditor } from "./team-name-editor"
 
 export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
@@ -271,6 +272,11 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    <TeamNameEditor
+                        teamId={data.teamId}
+                        teamName={data.teamName}
+                        phase={data.seasonConfig?.phase ?? null}
+                    />
                     {showWelcomeSection && (
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">

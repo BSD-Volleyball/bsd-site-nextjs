@@ -1,13 +1,25 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
-import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
+import {
+    withAction,
+    ok,
+    fail,
+    requirePositiveInt,
+    requireSeasonConfig,
+    requireSession
+} from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { db } from "@/database/db"
-import { users, waitlist, teams, drafts } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { users, waitlist, teams, drafts, divisions } from "@/database/schema"
+import { eq, and, ne, or, sql } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { isTeamRenameOpen, normalizeTeamName } from "@/lib/team-name"
+import { notifyCommissionersOfTeamRename } from "@/lib/notifications/team-renamed"
+import { formatDisplayName } from "@/lib/utils"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { getSessionUser, isAdminOrDirectorBySession } from "@/next/session"
 
@@ -127,7 +139,10 @@ export async function logContactDetailsViewed(): Promise<void> {
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                eq(teams.captain, sessionUser.id)
+                or(
+                    eq(teams.captain, sessionUser.id),
+                    eq(teams.captain2, sessionUser.id)
+                )
             )
         )
         .limit(1)
@@ -140,6 +155,119 @@ export async function logContactDetailsViewed(): Promise<void> {
         summary: `Captain viewed team contact details for team "${teamRow?.name ?? "unknown"}" (season ${config.seasonId})`
     })
 }
+
+/**
+ * Lets a team's own captain, co-captain or coach rename it while the season
+ * is between the draft and playoffs. The rename applies immediately; the
+ * division's commissioners are emailed so an unsuitable name is seen, and
+ * they can still change it on Select Captains.
+ */
+export const renameTeam = withAction(
+    async (teamId: number, rawName: string): Promise<ActionResult> => {
+        const session = await requireSession()
+        const id = requirePositiveInt(teamId, "team")
+        const config = await requireSeasonConfig()
+
+        const [team] = await db
+            .select({
+                id: teams.id,
+                name: teams.name,
+                captain: teams.captain,
+                captain2: teams.captain2,
+                division: teams.division,
+                divisionName: divisions.name
+            })
+            .from(teams)
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(and(eq(teams.id, id), eq(teams.season, config.seasonId)))
+            .limit(1)
+        if (!team) return fail("Team not found.")
+
+        // Ownership: a session alone is not enough, the caller must be this
+        // team's captain or captain2 (co-captain, or second coach).
+        if (
+            team.captain !== session.user.id &&
+            team.captain2 !== session.user.id
+        ) {
+            return fail("Unauthorized.")
+        }
+
+        if (!isTeamRenameOpen(config.phase)) {
+            return fail(
+                "Team names are locked for this part of the season. Ask your commissioner if it needs to change."
+            )
+        }
+
+        const checked = normalizeTeamName(rawName)
+        if (!checked.ok) return fail(checked.message)
+        const newName = checked.name
+        if (newName === team.name) return ok(undefined, "Team name unchanged.")
+
+        const [clash] = await db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, config.seasonId),
+                    eq(teams.division, team.division),
+                    ne(teams.id, team.id),
+                    sql`lower(${teams.name}) = lower(${newName})`
+                )
+            )
+            .limit(1)
+        if (clash) {
+            return fail("Another team in your division already has that name.")
+        }
+
+        try {
+            await db
+                .update(teams)
+                .set({ name: newName })
+                .where(eq(teams.id, team.id))
+        } catch (error) {
+            logger.error("Failed to rename team", { teamId: team.id }, error)
+            return fail("Something went wrong. Please try again.")
+        }
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "teams",
+            entityId: team.id,
+            summary: `Renamed team "${team.name}" to "${newName}" (${team.divisionName}, season ${config.seasonId})`
+        })
+
+        const [actor] = await db
+            .select({
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name
+            })
+            .from(users)
+            .where(eq(users.id, session.user.id))
+            .limit(1)
+        await notifyCommissionersOfTeamRename({
+            seasonId: config.seasonId,
+            divisionId: team.division,
+            divisionName: team.divisionName,
+            teamId: team.id,
+            oldName: team.name,
+            newName,
+            renamedByUserId: session.user.id,
+            renamedByName: actor
+                ? formatDisplayName(
+                      actor.firstName,
+                      actor.lastName,
+                      actor.preferredName
+                  )
+                : "A captain"
+        })
+
+        revalidateCalendarFeeds()
+        revalidatePath("/dashboard", "layout")
+        return ok(undefined, `Your team is now "${newName}".`)
+    }
+)
 
 export const expressWaitlistInterest = withAction(
     async (

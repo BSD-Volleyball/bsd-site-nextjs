@@ -796,3 +796,31 @@ export function buildCoverageDigestHtml(opts: {
         actionUrl: opts.coverageUrl
     })
 }
+
+/**
+ * Commissioner heads-up: a captain or coach renamed their own team. The
+ * rename has already happened; this is so an unsuitable name is seen quickly,
+ * and Select Captains is where a commissioner can change it back.
+ */
+export function buildTeamRenamedHtml(opts: {
+    firstName: string
+    renamedBy: string
+    divisionName: string
+    oldName: string
+    newName: string
+}): string {
+    return renderEmailHtml({
+        heading: "Team Renamed",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>${escapeHtml(opts.renamedBy)} renamed their ${escapeHtml(opts.divisionName)} team.</p>
+            ${renderDetailsBlock([
+                renderDetailRow("Old name", opts.oldName),
+                renderDetailRow("New name", opts.newName)
+            ])}
+            <p style="font-size:13px;color:#6b7280;">No action is needed. If the name isn't suitable, you can change it on the Select Captains page.</p>
+        `,
+        action: "Open Select Captains",
+        actionUrl: `${site.url}/dashboard/select-captains`
+    })
+}

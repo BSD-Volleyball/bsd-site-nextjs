@@ -12,7 +12,6 @@ import {
     teams,
     drafts,
     divisions,
-    individual_divisions,
     emailTemplates,
     seasonEvents,
     signups,
@@ -59,6 +58,7 @@ export interface CaptainSeasonInfo {
 }
 
 export interface CaptainWelcomeData {
+    teamId: number
     teamName: string
     divisionName: string
     divisionLevel: number | null
@@ -103,25 +103,17 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             )
             .limit(1)
 
-        // If not the primary captain, check if this user is a co-coach (captain2)
-        // in a coaches-mode division
+        // Otherwise they may be captain2: a co-captain, or the second coach
+        // in a coaches-mode division.
         let teamRow = primaryTeamRow
         if (!teamRow) {
-            const [coachTeamRow] = await db
+            const [coCaptainTeamRow] = await db
                 .select({
                     id: teams.id,
                     name: teams.name,
                     divisionId: teams.division
                 })
                 .from(teams)
-                .innerJoin(
-                    individual_divisions,
-                    and(
-                        eq(individual_divisions.season, config.seasonId),
-                        eq(individual_divisions.division, teams.division),
-                        eq(individual_divisions.coaches, true)
-                    )
-                )
                 .where(
                     and(
                         eq(teams.season, config.seasonId),
@@ -129,7 +121,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                     )
                 )
                 .limit(1)
-            teamRow = coachTeamRow
+            teamRow = coCaptainTeamRow
         }
 
         if (!teamRow) return null
@@ -387,6 +379,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             .limit(11)
 
         return {
+            teamId: teamRow.id,
             teamName: teamRow.name,
             divisionName: divisionRow?.name ?? "",
             divisionLevel: divisionRow?.level ?? null,

@@ -88,6 +88,11 @@ const strictExpectations = [
             "must limit contact details to actual sub candidates (isSubContactTarget)"
     },
     {
+        key: "src/app/dashboard/roster-actions.ts:renameTeam",
+        pattern: /team\.captain2\s*!==\s*session\.user\.id/,
+        description: "must limit renames to the team's own captain or captain2"
+    },
+    {
         key: "src/app/dashboard/pay-season/actions.ts:submitSeasonPayment",
         pattern: /await\s+validateFinalSignupAvailability\s*\(/,
         description:

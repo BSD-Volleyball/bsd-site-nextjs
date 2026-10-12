@@ -44,6 +44,7 @@ export type NotificationType =
     | "survey_invitation"
     | "survey_reminder"
     | "coverage_digest"
+    | "team_renamed"
     | "transactional"
 
 interface NotificationCategoryDef {
@@ -242,6 +243,14 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             label: "Admin coverage digest",
             description:
                 "Day-before summary of which admins are at the gym for each time slot.",
+            mandatory: true
+        },
+        team_renamed: {
+            category: null,
+            stream: "outbound",
+            label: "Team renamed",
+            description:
+                "Sent to a division's commissioners when one of its captains or coaches renames their team.",
             mandatory: true
         },
         transactional: {

@@ -1,15 +1,29 @@
 import { and, eq } from "drizzle-orm"
+import { revalidateTag } from "next/cache"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { drafts, waitlist, waiverAcceptances } from "@/database/schema"
+import {
+    auditLog,
+    drafts,
+    teams,
+    userRoles,
+    waitlist,
+    waiverAcceptances
+} from "@/database/schema"
 import {
     createDivision,
     createSeason,
     createTeam,
     createWaiver
 } from "@/test/factories"
+import { sentMessages, sentToAddresses } from "@/test/email"
 import { createUser, createUserWithRoles, loginAs } from "@/test/session"
-import { expressWaitlistInterest, getTeamRoster } from "./roster-actions"
+import { getCaptainWelcomeData } from "./roster-data"
+import {
+    expressWaitlistInterest,
+    getTeamRoster,
+    renameTeam
+} from "./roster-actions"
 
 // Seeds a past season and a current season, each with one team whose captain
 // drafted one player. getSeasonConfig resolves the highest season id as
@@ -210,5 +224,210 @@ describe("expressWaitlistInterest", () => {
             status: false,
             message: "You've already expressed interest for this season."
         })
+    })
+})
+
+describe("renameTeam", () => {
+    // A current regular-season division with two teams: Net Results
+    // (captain + co-captain) and Block Party. Optionally a division
+    // commissioner, a league-wide one, and one for another division.
+    async function seedRenameSeason(phase = "regular_season") {
+        const division = await createDivision({ name: "AA" })
+        const otherDivision = await createDivision({ name: "BB", level: 2 })
+        const season = await createSeason({ phase })
+        const captain = await createUser({ first_name: "Casey" })
+        const coCaptain = await createUser()
+        const otherCaptain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            captain: captain.id,
+            captain2: coCaptain.id,
+            division: division.id,
+            name: "Net Results",
+            number: 1
+        })
+        const otherTeam = await createTeam({
+            season: season.id,
+            captain: otherCaptain.id,
+            division: division.id,
+            name: "Block Party",
+            number: 2
+        })
+        return {
+            season,
+            division,
+            otherDivision,
+            captain,
+            coCaptain,
+            otherCaptain,
+            team,
+            otherTeam
+        }
+    }
+
+    async function teamName(teamId: number) {
+        const [row] = await db
+            .select({ name: teams.name })
+            .from(teams)
+            .where(eq(teams.id, teamId))
+        return row?.name
+    }
+
+    it("rejects unauthenticated callers", async () => {
+        const { team } = await seedRenameSeason()
+        const result = await renameTeam(team.id, "New Name")
+        expect(result).toEqual({
+            status: false,
+            message: "Not authenticated."
+        })
+        expect(await teamName(team.id)).toBe("Net Results")
+    })
+
+    it("lets the captain rename, audits it and emails the division's commissioners", async () => {
+        const { season, division, otherDivision, captain, team } =
+            await seedRenameSeason()
+        const divisionCommish = await createUser({
+            email: "div-commish@example.test"
+        })
+        const leagueCommish = await createUser({
+            email: "league-commish@example.test"
+        })
+        const otherCommish = await createUser({
+            email: "other-commish@example.test"
+        })
+        await db.insert(userRoles).values([
+            {
+                user_id: divisionCommish.id,
+                role: "commissioner",
+                season_id: season.id,
+                division_id: division.id
+            },
+            {
+                user_id: leagueCommish.id,
+                role: "commissioner",
+                season_id: season.id,
+                division_id: null
+            },
+            {
+                user_id: otherCommish.id,
+                role: "commissioner",
+                season_id: season.id,
+                division_id: otherDivision.id
+            }
+        ])
+        loginAs(captain)
+
+        const result = await renameTeam(team.id, "  Spike   Lee ")
+        expect(result.status).toBe(true)
+        expect(await teamName(team.id)).toBe("Spike Lee")
+
+        const audits = await db
+            .select({ summary: auditLog.summary, user: auditLog.user })
+            .from(auditLog)
+            .where(
+                and(
+                    eq(auditLog.entity_type, "teams"),
+                    eq(auditLog.entity_id, String(team.id))
+                )
+            )
+        expect(audits).toHaveLength(1)
+        expect(audits[0].user).toBe(captain.id)
+        expect(audits[0].summary).toContain('"Net Results" to "Spike Lee"')
+
+        expect(sentToAddresses().sort()).toEqual([
+            "div-commish@example.test",
+            "league-commish@example.test"
+        ])
+        expect(sentMessages()[0].subject).toBe(
+            '[BSD] AA: "Net Results" is now "Spike Lee"'
+        )
+        expect(revalidateTag).toHaveBeenCalled()
+    })
+
+    it("lets the co-captain (captain2) rename", async () => {
+        const { coCaptain, team } = await seedRenameSeason("draft")
+        loginAs(coCaptain)
+        const result = await renameTeam(team.id, "Dig Deep")
+        expect(result.status).toBe(true)
+        expect(await teamName(team.id)).toBe("Dig Deep")
+    })
+
+    it("refuses another team's captain", async () => {
+        const { otherCaptain, team } = await seedRenameSeason()
+        loginAs(otherCaptain)
+        const result = await renameTeam(team.id, "Hijacked")
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+        expect(await teamName(team.id)).toBe("Net Results")
+    })
+
+    it("refuses a commissioner who is not on the team (they use Select Captains)", async () => {
+        const { team } = await seedRenameSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await renameTeam(team.id, "Admin Name")
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("refuses a team from a past season", async () => {
+        const { captain, team } = await seedRenameSeason()
+        await createSeason({ phase: "regular_season" })
+        loginAs(captain)
+        const result = await renameTeam(team.id, "Old News")
+        expect(result).toEqual({ status: false, message: "Team not found." })
+    })
+
+    it("is locked during playoffs", async () => {
+        const { captain, team } = await seedRenameSeason("playoffs")
+        loginAs(captain)
+        const result = await renameTeam(team.id, "Late Change")
+        expect(result.status).toBe(false)
+        expect(await teamName(team.id)).toBe("Net Results")
+    })
+
+    it("refuses a blank name and a name another team in the division has", async () => {
+        const { captain, team } = await seedRenameSeason()
+        loginAs(captain)
+
+        expect((await renameTeam(team.id, "   ")).status).toBe(false)
+        expect(await renameTeam(team.id, "block party")).toEqual({
+            status: false,
+            message: "Another team in your division already has that name."
+        })
+        expect(await teamName(team.id)).toBe("Net Results")
+        expect(sentMessages()).toHaveLength(0)
+    })
+
+    it("never emails the renamer, even when they are a commissioner", async () => {
+        const { season, division, captain, team } = await seedRenameSeason()
+        await db.insert(userRoles).values({
+            user_id: captain.id,
+            role: "commissioner",
+            season_id: season.id,
+            division_id: division.id
+        })
+        loginAs(captain)
+        const result = await renameTeam(team.id, "Self Serve")
+        expect(result.status).toBe(true)
+        expect(sentMessages()).toHaveLength(0)
+    })
+})
+
+describe("getCaptainWelcomeData", () => {
+    it("finds the team for a co-captain in a standard division", async () => {
+        const division = await createDivision()
+        const season = await createSeason({ phase: "regular_season" })
+        const captain = await createUser()
+        const coCaptain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            captain: captain.id,
+            captain2: coCaptain.id,
+            division: division.id,
+            name: "Two Heads"
+        })
+        loginAs(coCaptain)
+
+        const data = await getCaptainWelcomeData()
+        expect(data?.teamId).toBe(team.id)
+        expect(data?.teamName).toBe("Two Heads")
     })
 })

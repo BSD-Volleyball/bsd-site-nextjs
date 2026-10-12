@@ -1,11 +1,10 @@
 import "server-only"
 
-import { and, eq, or } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import {
     divisions,
     drafts,
-    individual_divisions,
     teams,
     users,
     week1Rosters,
@@ -62,7 +61,8 @@ export interface SeasonProgress {
     hasWeek3RosterData: boolean
     isWeek2Captain: boolean
     isSeasonCaptain: boolean
-    isSeasonCoach: boolean
+    /** captain2 of a team: co-captain, or second coach in a coaches division */
+    isSeasonCoCaptain: boolean
     isDivisionDrafted: boolean
     captainWelcomeData: CaptainWelcomeData | null
     playerTeamAssignment: PlayerTeamAssignment | null
@@ -82,7 +82,7 @@ export const EMPTY_SEASON_PROGRESS: SeasonProgress = {
     hasWeek3RosterData: false,
     isWeek2Captain: false,
     isSeasonCaptain: false,
-    isSeasonCoach: false,
+    isSeasonCoCaptain: false,
     isDivisionDrafted: false,
     captainWelcomeData: null,
     playerTeamAssignment: null,
@@ -351,36 +351,23 @@ export async function loadSeasonProgress(
             .limit(1)
         progress.isSeasonCaptain = !!captainTeamEntry
 
-        // Check for coaches (captain or captain2 in a coaches-mode division)
+        // captain2 is a co-captain, or the second coach in a coaches-mode
+        // division; either way they run the team alongside the captain.
         let teamCardEntry = captainTeamEntry
         if (!progress.isSeasonCaptain) {
-            const [coachTeamEntry] = await db
+            const [coCaptainTeamEntry] = await db
                 .select({ id: teams.id, divisionId: teams.division })
                 .from(teams)
-                .innerJoin(
-                    individual_divisions,
-                    and(
-                        eq(individual_divisions.season, seasonId),
-                        eq(individual_divisions.division, teams.division),
-                        eq(individual_divisions.coaches, true)
-                    )
-                )
                 .where(
-                    and(
-                        eq(teams.season, seasonId),
-                        or(
-                            eq(teams.captain, userId),
-                            eq(teams.captain2, userId)
-                        )
-                    )
+                    and(eq(teams.season, seasonId), eq(teams.captain2, userId))
                 )
                 .limit(1)
-            progress.isSeasonCoach = !!coachTeamEntry
-            teamCardEntry = coachTeamEntry
+            progress.isSeasonCoCaptain = !!coCaptainTeamEntry
+            teamCardEntry = coCaptainTeamEntry
         }
 
         if (
-            (progress.isSeasonCaptain || progress.isSeasonCoach) &&
+            (progress.isSeasonCaptain || progress.isSeasonCoCaptain) &&
             teamCardEntry
         ) {
             const [draftRecord] = await db
@@ -398,7 +385,7 @@ export async function loadSeasonProgress(
         }
 
         if (
-            (progress.isSeasonCaptain || progress.isSeasonCoach) &&
+            (progress.isSeasonCaptain || progress.isSeasonCoCaptain) &&
             progress.isDivisionDrafted
         ) {
             progress.captainWelcomeData = await getCaptainWelcomeData()

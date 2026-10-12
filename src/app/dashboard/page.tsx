@@ -98,7 +98,7 @@ export default async function DashboardPage() {
             "playoffs",
             "complete"
         ].includes(signupStatus.config.phase) &&
-        (data.isSeasonCaptain || data.isSeasonCoach) &&
+        (data.isSeasonCaptain || data.isSeasonCoCaptain) &&
         data.isDivisionDrafted &&
         data.captainWelcomeData
     )
