@@ -314,6 +314,36 @@ export function OverallInformationSection() {
                         non-marking footwear.
                     </p>
                 </div>
+
+                <div>
+                    <h3 className="font-medium text-foreground text-xl">
+                        2.14 Player Age Requirements
+                    </h3>
+                    <p>
+                        BSD Volleyball is an adult volleyball league. Players
+                        under 14 years of age are not eligible to play. Players
+                        ages 14-17 may play under the following conditions:
+                    </p>
+                    <ul className="mt-2 list-disc space-y-2 pl-6">
+                        <li>
+                            <strong>0-13 years</strong> - Not eligible to play.
+                        </li>
+                        <li>
+                            <strong>14-15 years</strong> - Eligible to play if
+                            their parent or legal-age guardian plays on same
+                            team.
+                        </li>
+                        <li>
+                            <strong>16-17 years</strong> - Eligible to play if
+                            their parent or legal-age guardian is present in the
+                            gym during all matches.
+                        </li>
+                        <li>
+                            <strong>18+</strong> - Eligible to play with no
+                            restrictions.
+                        </li>
+                    </ul>
+                </div>
             </div>
         </section>
     )
