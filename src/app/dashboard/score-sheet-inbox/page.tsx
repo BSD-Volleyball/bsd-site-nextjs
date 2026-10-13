@@ -17,8 +17,9 @@ export const metadata: Metadata = {
 }
 
 /**
- * Reading a sheet decodes a photo and may call out to a transcriber, so give
- * the route room. Server actions inherit their segment's ceiling.
+ * Reading a sheet decodes a photo and asks two vision models to read it (about
+ * 6-30s each, in parallel), so give the route room. Server actions inherit
+ * their segment's ceiling.
  */
 export const maxDuration = 300
 

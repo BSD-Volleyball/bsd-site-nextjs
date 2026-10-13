@@ -1,11 +1,11 @@
 /**
  * pipeline.ts — the impure half of reading a sheet.
  *
- * Everything else under `read/` is pure and takes its inputs as arguments.
- * This module is where storage, the database and the clock come in: fetch the
- * photo, find the layout it was printed with, run the read, record what came
- * back. Keeping the boundary here is what lets the difficult parts be tested
- * with known answers and no I/O at all.
+ * Everything else under `read/` takes its inputs as arguments. This module is
+ * where storage, the database and the clock come in: fetch the photo, find the
+ * layout it was printed with and the teams on it, run the read, record what
+ * came back. The readers are injectable, so the whole path is tested with
+ * fakes and no network.
  */
 
 import { eq } from "drizzle-orm"
@@ -17,14 +17,17 @@ import { getR2Object } from "@/lib/r2"
 
 import { findScoreSheetPrint, type ScoreSheetPrint } from "../prints"
 import { loadScoreSheetNight } from "../load"
-import type { SheetEventType } from "../types"
+import { sheetCode, sheetTag } from "../sheet-config"
+import type { SheetEventType, SheetNight } from "../types"
 import { decodeJpeg } from "./image"
-import { type IdentityResult, readSheetTagFromPhoto } from "./identity"
-import { readSheet, type SheetRead } from "./read"
+import {
+    type IdentityResult,
+    parseSheetCode,
+    readSheetTagFromPhoto
+} from "./identity"
+import { type PageReader, pageReadersFromEnv } from "./page-reader"
+import { readSheet, type SheetMatchInput, type SheetRead } from "./read"
 import { storeScoreSamples } from "./samples"
-import type { Transcriber } from "./transcriber/port"
-import { nullTranscriber } from "./transcriber/stub"
-import { transcriberFromEnv } from "./transcriber/vision"
 
 /** Statuses a row can hold; only a human produces `confirmed`. */
 export type StoredReadStatus =
@@ -44,10 +47,10 @@ interface ProcessOptions {
     scoreSheetId: number
     seasonId: number
     /**
-     * Defaults to whatever is configured, or to the null reader when nothing
-     * is, which still yields the ticks and the sheet's identity.
+     * Defaults to whatever is configured, or to none when nothing is, which
+     * still identifies the sheet from its QR code.
      */
-    transcriber?: Transcriber
+    readers?: readonly PageReader[]
     /** Court supplied by an admin when the tag could not be read. */
     courtHint?: number | null
 }
@@ -81,54 +84,151 @@ async function readImageBytes(key: string): Promise<Uint8Array | null> {
     return bytes
 }
 
+interface Layout {
+    matches: SheetMatchInput[]
+    eventType: SheetEventType
+    court: number | null
+    print: ScoreSheetPrint | null
+    reconstructed: boolean
+    tag: IdentityResult | null
+    expectedSheetCode: string | null
+}
+
+type LayoutOutcome = { layout: Layout } | { problem: string }
+
+/** The code printed beside the QR for a court, from whichever source knows the night. */
+function expectedCode(
+    night: Pick<SheetNight, "seasonCode" | "eventType" | "ordinal"> | null,
+    tag: IdentityResult | null,
+    court: number | null
+): string | null {
+    if (tag) {
+        return sheetCode(
+            {
+                seasonCode: tag.parts.seasonCode,
+                eventType:
+                    tag.parts.phase === "P" ? "playoff" : "regular_season",
+                ordinal: tag.parts.ordinal
+            },
+            court
+        )
+    }
+    return night ? sheetCode(night, court) : null
+}
+
 /**
- * Work out which sheet a photo is and what it was printed with.
+ * Work out which sheet a photo is, what it was printed with, and who played.
  *
- * The tag is the direct route. Without it we fall back to the night's current
- * schedule for the court the admin named, which is right almost always and
- * flagged when it is not: a sheet printed before a schedule change has a
- * different number of blocks, and the reader notices.
+ * Three ways to know the court, in order of trust: the QR tag (free, exact,
+ * and it names the print record); the court an admin chose; and the code
+ * printed beside the QR, read by a model, for a photo whose QR will not
+ * decode. Without the court there are no team names to give the readers, so
+ * a sheet none of these identify stops here and asks.
  */
 async function resolveLayout(
     seasonId: number,
     matchDate: string,
     photo: Uint8Array,
-    courtHint: number | null
-): Promise<{
-    matchIds: number[]
-    eventType: SheetEventType
-    print: ScoreSheetPrint | null
-    reconstructed: boolean
-    photoTag: IdentityResult | null
-} | null> {
-    const fromPhoto = readSheetTagFromPhoto(decodeJpeg(photo))
-    if (fromPhoto) {
-        const print = await findScoreSheetPrint(fromPhoto.text)
-        if (print) {
+    courtHint: number | null,
+    readers: readonly PageReader[]
+): Promise<LayoutOutcome> {
+    const tag = readSheetTagFromPhoto(decodeJpeg(photo))
+    const night = await loadScoreSheetNight(seasonId, matchDate)
+
+    // A tag may legitimately say "no court" (the TBD sheet); only an
+    // untagged photo needs the court from somewhere else.
+    let court: number | null
+    if (tag) {
+        court = tag.parts.court
+    } else {
+        const found =
+            courtHint ?? (await courtFromPrintedCode(photo, readers, night))
+        if (typeof found === "string") return { problem: found }
+        if (found === null) {
             return {
-                matchIds: print.matchIds,
-                eventType: print.eventType,
-                print,
-                reconstructed: false,
-                photoTag: fromPhoto
+                problem:
+                    "This sheet's code could not be read. Choose which court it is and try again."
             }
+        }
+        court = found
+    }
+
+    // The print record says exactly which matches were on the paper. Found by
+    // the tag the QR carried, or the one this court's sheet would have had.
+    const printedTag = tag?.text ?? (night ? sheetTag(night, court) : null)
+    const print = printedTag ? await findScoreSheetPrint(printedTag) : null
+    const scheduled = night?.courts.find((c) => c.court === court)
+    const matchIds =
+        print?.matchIds ?? scheduled?.matches.map((m) => m.matchId) ?? []
+    if (matchIds.length === 0) {
+        return {
+            problem: `No matches are scheduled on court ${court} that night.`
         }
     }
 
-    const court = fromPhoto?.parts.court ?? courtHint
-    if (court === null || court === undefined) return null
-
-    const night = await loadScoreSheetNight(seasonId, matchDate)
-    const sheet = night?.courts.find((c) => c.court === court)
-    if (!night || !sheet) return null
+    // Names as the sheet printed them. A match since moved off this court is
+    // still found by id on whichever court it went to.
+    const byId = new Map(
+        (night?.courts ?? [])
+            .flatMap((c) => c.matches)
+            .map((m) => [m.matchId, m])
+    )
+    const matches = matchIds.map((matchId) => {
+        const match = byId.get(matchId)
+        return {
+            matchId,
+            home: match?.home.name ?? "(unknown team)",
+            away: match?.away.name ?? "(unknown team)"
+        }
+    })
 
     return {
-        matchIds: sheet.matches.map((m) => m.matchId),
-        eventType: night.eventType,
-        print: null,
-        reconstructed: true,
-        photoTag: fromPhoto
+        layout: {
+            matches,
+            eventType: print?.eventType ?? night?.eventType ?? "regular_season",
+            court,
+            print,
+            reconstructed: !print,
+            tag,
+            expectedSheetCode: expectedCode(night, tag, court)
+        }
     }
+}
+
+/**
+ * Ask the first reader for the printed code, and check it belongs to this
+ * night. Returns the court, null when nothing legible came back, or a problem
+ * to report when the code names some other night.
+ */
+async function courtFromPrintedCode(
+    photo: Uint8Array,
+    readers: readonly PageReader[],
+    night: SheetNight | null
+): Promise<number | null | string> {
+    const [reader] = readers
+    if (!reader || !night) return null
+
+    let code: string | null
+    try {
+        code = await reader.readCode(photo)
+    } catch (error) {
+        logger.warn("[scoresheets] Could not read the printed sheet code", {
+            error: error instanceof Error ? error.message : String(error)
+        })
+        return null
+    }
+    const parts = code ? parseSheetCode(code) : null
+    if (!code || !parts) return null
+
+    const phase = night.eventType === "playoff" ? "P" : "W"
+    if (
+        parts.seasonCode !== night.seasonCode ||
+        parts.phase !== phase ||
+        parts.ordinal !== night.ordinal
+    ) {
+        return `This sheet is marked ${code}, which is not from this night. Check the photo was uploaded to the right date.`
+    }
+    return parts.court
 }
 
 export async function processScoreSheet(
@@ -171,28 +271,39 @@ export async function processScoreSheet(
         const bytes = await readImageBytes(sheet.image_path)
         if (!bytes) throw new Error("The uploaded photo is no longer stored.")
 
-        const layout = await resolveLayout(
+        const readers = opts.readers ?? pageReadersFromEnv()
+        const outcome = await resolveLayout(
             opts.seasonId,
             sheet.match_date,
             bytes,
-            opts.courtHint ?? sheet.court
+            opts.courtHint ?? sheet.court,
+            readers
         )
-        if (!layout) {
+        if ("problem" in outcome) {
             return await finish(opts.scoreSheetId, attempts, {
                 status: "unidentified",
-                problems: [
-                    "This sheet's code could not be read. Choose which court it is and try again."
-                ]
+                problems: [outcome.problem]
             })
+        }
+        const { layout } = outcome
+
+        // Filed as soon as the court is known, so the inbox can show it even
+        // if the read itself goes on to fail.
+        if (layout.court !== sheet.court) {
+            await db
+                .update(scoreSheets)
+                .set({ court: layout.court })
+                .where(eq(scoreSheets.id, opts.scoreSheetId))
         }
 
         const result = await readSheet({
-            image: decodeJpeg(bytes),
-            matchIds: layout.matchIds,
+            photo: bytes,
+            matches: layout.matches,
             eventType: layout.eventType,
-            photoTag: layout.photoTag,
-            transcriber:
-                opts.transcriber ?? transcriberFromEnv() ?? nullTranscriber
+            readers,
+            identity: layout.tag?.parts ?? null,
+            tag: layout.tag?.text ?? null,
+            expectedSheetCode: layout.expectedSheetCode
         })
 
         const problems = [...result.problems]
@@ -201,54 +312,34 @@ export async function processScoreSheet(
                 "No record of this sheet being printed, so the layout came from tonight's current schedule."
             )
         }
-        if (
-            layout.print &&
-            layout.print.matchIds.length !== layout.matchIds.length
-        ) {
-            problems.push(
-                "The sheet was printed with a different set of matches than are scheduled now."
-            )
-        }
 
         const status: StoredReadStatus =
             result.status === "read" && problems.length === 0
                 ? "read"
-                : result.status === "not_located"
-                  ? "not_located"
-                  : result.status === "unidentified"
-                    ? "unidentified"
-                    : "needs_review"
-
-        // Record the court the tag gave us, so the inbox can file the photo.
-        if (result.identity?.court != null) {
-            await db
-                .update(scoreSheets)
-                .set({ court: result.identity.court })
-                .where(eq(scoreSheets.id, opts.scoreSheetId))
-        }
+                : result.status === "failed"
+                  ? "failed"
+                  : "needs_review"
 
         const stored = await upsertRead(opts.scoreSheetId, {
             status,
             attempts,
             tag: result.tag,
-            template_version: result.identity?.templateVersion ?? null,
+            template_version: layout.tag?.parts.templateVersion ?? null,
             result: { ...result, problems },
             problems,
             transcriber: result.transcriber,
-            residual_pt: result.locate
-                ? String(result.locate.residualPt)
-                : null,
+            residual_pt: null,
             finished_at: new Date(),
-            error: null
+            error: status === "failed" ? (problems[0] ?? null) : null
         })
 
-        // Keep the crops alongside what the reader thought they said. The
-        // confirmed answer arrives later, when the night is saved.
-        if (stored && result.crops.length > 0) {
+        // Keep what the readers concluded beside the photo. The confirmed
+        // answer arrives later, when the night is saved.
+        if (stored && result.matches.length > 0) {
             await storeScoreSamples(
                 stored,
                 { ...result, problems },
-                result.crops
+                sheet.image_path
             )
         }
 

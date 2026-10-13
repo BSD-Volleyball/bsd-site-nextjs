@@ -1,18 +1,16 @@
 /**
  * identity.ts — work out which sheet a photo is.
  *
- * The tag QR is decoded from the *rectified* page rather than the raw photo.
- * Two things make that much more likely to succeed: the symbol is upright and
- * at a known scale, and we can surround it with the white quiet zone the print
- * does not have. The sheet is rendered with `margin: 0`, so on paper the
- * symbol runs flush to its own edge, which is exactly the condition decoders
- * struggle with.
+ * The small QR in the bottom-right corner carries the sheet's tag, and the
+ * code printed above it says the same thing in letters. The QR is decoded
+ * here, for free and with no model; it decoded from 6 of 6 photos taken flat
+ * on a table (2026-10-08) but only 3 of 6 taken folded on a lap (2026-10-01),
+ * so the pipeline falls back to asking a reader for the printed code.
  */
 
 import jsQR from "jsqr"
 
-import { grayToRgba, type RasterImage, sampleRect } from "./image"
-import type { PageTransform } from "./locate"
+import { grayToRgba, type RasterImage } from "./image"
 
 export interface SheetTagParts {
     templateVersion: number
@@ -44,79 +42,41 @@ export function parseSheetTag(text: string): SheetTagParts | null {
     }
 }
 
-/** Surround a sample with white so the symbol has the margin it needs. */
-function padWithQuietZone(img: RasterImage, border: number): RasterImage {
-    const width = img.width + border * 2
-    const height = img.height + border * 2
-    const gray = new Uint8Array(width * height).fill(255)
-    for (let y = 0; y < img.height; y++) {
-        gray.set(
-            img.gray.subarray(y * img.width, (y + 1) * img.width),
-            (y + border) * width + border
-        )
-    }
-    return { width, height, gray }
-}
-
-function decode(img: RasterImage): string | null {
-    const result = jsQR(grayToRgba(img), img.width, img.height, {
-        inversionAttempts: "dontInvert"
-    })
-    return result?.data ?? null
-}
-
 export interface IdentityResult {
     text: string
     parts: SheetTagParts
 }
 
-/**
- * Read the tag from a located page. Tries a couple of sampling scales before
- * giving up, because the right one depends on how much of the photo the page
- * actually fills.
- */
-export function readSheetTag(
-    img: RasterImage,
-    transform: PageTransform,
-    tagQr: { x: number; y: number; w: number; h: number }
-): IdentityResult | null {
-    for (const scale of [6, 10, 4]) {
-        const sample = sampleRect(img, transform.toImage, tagQr, scale)
-        // Four modules of white all round, the standard quiet zone.
-        const border = Math.round((sample.width / 25) * 4)
-        const text = decode(padWithQuietZone(sample, border))
-        if (!text) continue
-
-        const parts = parseSheetTag(text)
-        if (parts) return { text, parts }
-    }
-    return null
-}
-
-/** Last resort: decode straight from the photo, before the page is located. */
-export function readSheetTagFromPhoto(
-    img: RasterImage
-): (IdentityResult & { corners: ReturnType<typeof cornersOf> }) | null {
+/** Decode the tag straight from the photo. */
+export function readSheetTagFromPhoto(img: RasterImage): IdentityResult | null {
     const result = jsQR(grayToRgba(img), img.width, img.height, {
         inversionAttempts: "dontInvert"
     })
     if (!result) return null
     const parts = parseSheetTag(result.data)
     if (!parts) return null
-    return { text: result.data, parts, corners: cornersOf(result) }
+    return { text: result.data, parts }
 }
 
-function cornersOf(result: NonNullable<ReturnType<typeof jsQR>>) {
-    const l = result.location
-    return [
-        l.topLeftCorner,
-        l.topRightCorner,
-        l.bottomRightCorner,
-        l.bottomLeftCorner
-    ] as [
-        { x: number; y: number },
-        { x: number; y: number },
-        { x: number; y: number },
-        { x: number; y: number }
-    ]
+export interface SheetCodeParts {
+    seasonCode: string
+    phase: "W" | "P"
+    ordinal: number
+    /** Null for the trailing sheet of matches with no court ("CTBD"). */
+    court: number | null
+}
+
+const CODE_PATTERN = /^([A-Z]\d{2})-([WP])(\d+)-C(\d+|TBD)$/
+
+/** The printed code beside the QR, as `sheetCode()` writes it: "F26-W4-C3". */
+export function parseSheetCode(code: string): SheetCodeParts | null {
+    const match = CODE_PATTERN.exec(code.toUpperCase().replace(/\s+/g, ""))
+    if (!match) return null
+    const [, seasonCode, phase, ordinal, court] = match
+    return {
+        seasonCode,
+        phase: phase as "W" | "P",
+        ordinal: Number.parseInt(ordinal, 10),
+        court: court === "TBD" ? null : Number.parseInt(court, 10)
+    }
 }

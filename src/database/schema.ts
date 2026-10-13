@@ -1544,7 +1544,7 @@ export const scoreSheetReads = pgTable(
         result: jsonb("result"),
         problems: text("problems").array().notNull().default(sql`'{}'::text[]`),
         transcriber: text("transcriber"),
-        /** How well the page was located, in page points. */
+        /** Earlier reader only: how well the page was located, in points. */
         residual_pt: numeric("residual_pt"),
         /** Guards against a double click charging for two reads. */
         attempts: integer("attempts").default(0).notNull(),
@@ -1583,10 +1583,13 @@ export const scoreSheetScoreSamples = pgTable(
         read_id: integer("read_id")
             .notNull()
             .references(() => scoreSheetReads.id, { onDelete: "cascade" }),
-        /** `${matchId}:${team}:${game}`, the crop's identity within a sheet. */
+        /** `${matchId}:${team}:${game}`, one team's score in one game. */
         crop_id: text("crop_id").notNull(),
         match_id: integer("match_id"),
-        /** R2 key of the cropped image. */
+        /**
+         * R2 key of the image the prediction came from: the sheet photo, or for
+         * rows from the earlier crop-based reader, a cropped box.
+         */
         image_path: text("image_path").notNull(),
         /** What the reader thought, before a human looked. */
         predicted: integer("predicted"),

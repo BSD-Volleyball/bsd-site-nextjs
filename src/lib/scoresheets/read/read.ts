@@ -1,44 +1,22 @@
 /**
  * read.ts — the whole read, in one pure function.
  *
- * Takes a photograph and a description of the sheet it should be, and returns
- * what it can make out. No database, no storage, no network: the transcriber
- * arrives as an argument, so every stage of this can be tested with known
- * inputs and known answers.
+ * Takes a photograph, the matches the sheet was printed with, and the readers
+ * to ask, and returns what can be made out. No database and no storage: the
+ * readers arrive as arguments, so the logic here is tested with fakes and
+ * known answers.
  *
- * Deliberately never produces a score it is not willing to defend. Each field
- * carries a level, and only `high` means "offer this without comment".
+ * Deliberately never produces a score it is not willing to defend. Each game
+ * carries a level, and only `high` — both readers agreeing on a legal score —
+ * means "offer this without comment".
  */
 
-import { buildSheetGeometry, type SheetGeometry } from "../layout"
-import type { CourtSheet, SheetEventType, SheetMatch } from "../types"
-import { type CheckReading, readCheckbox } from "./checkbox"
-import { cropId, cropScoreBoxes, type ScoreCrop } from "./crops"
-import {
-    type IdentityResult,
-    readSheetTag,
-    type SheetTagParts
-} from "./identity"
-import type { RasterImage } from "./image"
-import { locatePage, type PageTransform } from "./locate"
-import {
-    type GameVerdict,
-    type MatchVerdict,
-    reconcileGame,
-    reconcileMatch,
-    type ScoreCandidate
-} from "./reconcile"
-import { refineGameBoxes } from "./refine"
-import { gameConstraint } from "./rules"
-import { validateReadings } from "./transcriber/port"
-import type { Transcriber } from "./transcriber/port"
+import type { SheetEventType } from "../types"
+import { combineReadings, type MatchVerdict } from "./combine"
+import type { SheetTagParts } from "./identity"
+import type { PageReader, PageReading } from "./page-reader"
 
-type ReadStatus =
-    | "read"
-    | "needs_review"
-    | "unidentified"
-    | "not_located"
-    | "failed"
+type ReadStatus = "read" | "needs_review" | "failed"
 
 export interface MatchRead extends MatchVerdict {
     matchId: number
@@ -47,258 +25,135 @@ export interface MatchRead extends MatchVerdict {
 
 export interface SheetRead {
     status: ReadStatus
-    /** What the page says it is, when the tag could be decoded. */
+    /** What the sheet's QR code says it is, when it could be decoded. */
     tag: string | null
     identity: SheetTagParts | null
-    locate: {
-        method: PageTransform["method"]
-        fiducialsFound: number
-        residualPt: number
-    } | null
     matches: MatchRead[]
-    /** Crops of anything a human should look at, keyed by field. */
-    crops: ScoreCrop[]
     /** Plain-language reasons this needs attention. */
     problems: string[]
+    /** The models that were asked, for the record. */
     transcriber: string
+    /**
+     * Each model's own reading, kept whole so the readers' accuracy can be
+     * measured later against what was saved. Absent on reads stored before
+     * the whole-page reader.
+     */
+    readings?: PageReading[]
+}
+
+export interface SheetMatchInput {
+    matchId: number
+    /** As printed: the top row of the block. */
+    home: string
+    away: string
 }
 
 interface ReadInput {
-    image: RasterImage
-    /** The layout the sheet was printed with, from its print record. */
-    matchIds: number[]
+    photo: Uint8Array
+    /** The layout the sheet was printed with, in printed order. */
+    matches: SheetMatchInput[]
     eventType: SheetEventType
-    transcriber: Transcriber
-    signal?: AbortSignal
+    readers: readonly PageReader[]
+    /** The sheet's QR tag, when it decoded. */
+    identity: SheetTagParts | null
+    tag: string | null
     /**
-     * The tag as already decoded from the raw photo, used when the rectified
-     * page will not give it up. On real photos the raw decode is the more
-     * reliable of the two (6/6 against 4/6 on 2026-10-08), and the caller
-     * chose `matchIds` from it, so discarding it would file a correctly read
-     * sheet as "court unknown".
+     * The code printed beside the small QR (e.g. "F26-W4-C3") for the court
+     * this photo has been filed under. Each reader reports what it sees there,
+     * and a difference means the photo was filed against the wrong court.
      */
-    photoTag?: IdentityResult | null
+    expectedSheetCode: string | null
+    signal?: AbortSignal
 }
 
-/**
- * Geometry depends only on how many matches a sheet carried and what kind of
- * night it was, so a handful of ids is enough to rebuild the exact page.
- */
-export function geometryForPrint(
-    matchIds: readonly number[],
-    eventType: SheetEventType
-): SheetGeometry {
-    const matches: SheetMatch[] = matchIds.map((matchId, index) => ({
-        matchId,
-        orderOnCourt: index + 1,
-        divisionName: "",
-        time: null,
-        playoff: eventType === "playoff",
-        playoffMatchNum: null,
-        bracket: null,
-        home: { teamId: null, name: "", isPlaceholder: true, captains: [] },
-        away: { teamId: null, name: "", isPlaceholder: true, captains: [] },
-        referee: null,
-        backupReferee: null,
-        workTeam: null
-    }))
-    const sheet: CourtSheet = { court: null, matches }
-    return buildSheetGeometry(sheet, eventType)
+/** "f26 - w4 - c3" and "F26-W4-C3" are the same code. */
+export function normalizeSheetCode(code: string): string {
+    return code.toUpperCase().replace(/\s+/g, "")
+}
+
+function errorText(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
 }
 
 export async function readSheet(input: ReadInput): Promise<SheetRead> {
-    const printed = geometryForPrint(input.matchIds, input.eventType)
+    const base = {
+        tag: input.tag,
+        identity: input.identity,
+        transcriber: input.readers.map((r) => r.name).join(" + ") || "none"
+    }
 
-    const transform = locatePage(input.image)
-    if (!transform) {
+    if (input.readers.length === 0) {
         return {
-            status: "not_located",
-            tag: null,
-            identity: null,
-            locate: null,
+            ...base,
+            status: "needs_review",
             matches: [],
-            crops: [],
             problems: [
-                "Could not find the page in this photo. Retake it with all four corner marks visible."
-            ],
-            transcriber: input.transcriber.name
+                "Reading handwriting is not set up here, so type the scores in from the photo."
+            ]
         }
     }
 
-    const locate = {
-        method: transform.method,
-        fiducialsFound: transform.fiducialsFound,
-        residualPt: transform.residualPt
-    }
-    const problems: string[] = []
-
-    const identity =
-        readSheetTag(input.image, transform, printed.tagQr) ??
-        input.photoTag ??
-        null
-
-    // The page fit is exact at the corner marks and only there; a folded or
-    // curled page puts its boxes elsewhere. Find each game's boxes by their
-    // printed outlines before reading anything inside them.
-    const { geometry, unlocated, uncheckedWins } = refineGameBoxes(
-        input.image,
-        transform.toImage,
-        printed
-    )
-    if (!identity) {
-        problems.push(
-            "The sheet's code could not be read, so which court this is must be confirmed by hand."
-        )
-    }
-
-    // Ink first, then the transcriber. A box we believe is empty is never
-    // shown to a model, so an empty game cannot acquire a score.
-    const located = {
-        ...geometry,
-        games: geometry.games.filter(
-            (g) => !unlocated.has(cropId(g.matchId, g.team, g.game))
-        )
-    }
-    const { written, blank } = cropScoreBoxes(
-        input.image,
-        transform.toImage,
-        located,
-        input.eventType
-    )
-
-    let candidates = new Map<string, ScoreCandidate>()
-    let transcriberName = input.transcriber.name
-    if (written.length > 0) {
-        try {
-            const raw = await input.transcriber.transcribe(
-                written,
-                input.signal
-            )
-            const digitsById = new Map(
-                written.map((c) => [c.id, c.digitsWritten])
-            )
-            candidates = new Map(
-                // Tolerant here on purpose. The transcriber checks each of its
-                // own requests strictly, so anything that arrives has already
-                // been proved to line up; a box missing at this level means a
-                // request failed, and those boxes read as unreadable rather
-                // than costing the sheet the ones that succeeded.
-                validateReadings(written, raw, { allowMissing: true }).map(
-                    (r) => [
-                        r.id,
-                        {
-                            value: r.value,
-                            confidence: r.confidence,
-                            alternatives: r.alternatives,
-                            digitsWritten: digitsById.get(r.id)
-                        }
-                    ]
-                )
-            )
-        } catch (error) {
-            // The deterministic half still stands, so carry on without digits
-            // rather than losing the ticks too.
-            transcriberName = `${input.transcriber.name} (failed)`
-            problems.push(
-                `Handwriting could not be read: ${
-                    error instanceof Error ? error.message : String(error)
-                }`
-            )
-        }
-    }
-
-    const blankIds = new Set(blank)
-    const matches: MatchRead[] = input.matchIds.map((matchId, index) => {
-        const games: GameVerdict[] = ([1, 2, 3] as const).map((game) => {
-            const constraint = gameConstraint(input.eventType, game)
-            const cell = (team: "home" | "away") => {
-                const id = cropId(matchId, team, game)
-                // Null means "this box is empty paper", and only the ink may
-                // say that. A box the transcriber gave no answer for has ink
-                // in it and is merely unreadable, so it gets an empty
-                // candidate instead. Returning null here would let a failed
-                // model turn a played game into a confident "never played" —
-                // the stub answers every crop, so only a real timeout or a
-                // refused request ever took this path, and one did the first
-                // time a real photograph went through.
-                if (blankIds.has(id)) return null
-                return candidates.get(id) ?? { value: null, confidence: 0 }
-            }
-            const tick = (team: "home" | "away"): CheckReading => {
-                // A box we could not find tells us nothing either way.
-                const id = cropId(matchId, team, game)
-                if (unlocated.has(id) || uncheckedWins.has(id)) {
-                    return { inkRatio: 0, state: "ambiguous", confidence: 0 }
-                }
-                const box = geometry.games.find(
-                    (g) =>
-                        g.matchId === matchId &&
-                        g.team === team &&
-                        g.game === game
-                )
-                if (!box) {
-                    return {
-                        inkRatio: 0,
-                        state: "unmarked" as const,
-                        confidence: 0
-                    }
-                }
-                return readCheckbox(input.image, transform.toImage, box.win)
-            }
-
-            return reconcileGame({
-                constraint,
-                home: cell("home"),
-                away: cell("away"),
-                homeWin: tick("home"),
-                awayWin: tick("away")
+    const settled = await Promise.allSettled(
+        input.readers.map((reader) =>
+            reader.read({
+                photo: input.photo,
+                matches: input.matches,
+                eventType: input.eventType,
+                signal: input.signal
             })
-        })
+        )
+    )
 
-        const verdict = reconcileMatch(games)
-        return { ...verdict, matchId, orderOnCourt: index + 1 }
+    const readings: PageReading[] = []
+    const problems: string[] = []
+    settled.forEach((outcome, i) => {
+        if (outcome.status === "fulfilled") readings.push(outcome.value)
+        else {
+            problems.push(
+                `${input.readers[i].name} could not read this sheet: ${errorText(outcome.reason)}`
+            )
+        }
     })
 
+    if (readings.length === 0) {
+        return { ...base, status: "failed", matches: [], problems }
+    }
+
+    if (input.expectedSheetCode) {
+        const expected = normalizeSheetCode(input.expectedSheetCode)
+        for (const reading of readings) {
+            if (
+                reading.sheetCode &&
+                normalizeSheetCode(reading.sheetCode) !== expected
+            ) {
+                problems.push(
+                    `${reading.model} read the sheet's code as ${reading.sheetCode}, but this photo is filed as ${input.expectedSheetCode}. Check it is the right court.`
+                )
+            }
+        }
+    }
+
+    const verdicts = combineReadings(
+        input.eventType,
+        input.matches.length,
+        readings
+    )
+    const matches: MatchRead[] = verdicts.map((verdict, index) => ({
+        ...verdict,
+        matchId: input.matches[index].matchId,
+        orderOnCourt: index + 1
+    }))
     for (const match of matches) {
         for (const problem of match.problems) {
             problems.push(`Match ${match.orderOnCourt}: ${problem}`)
         }
     }
-    if (unlocated.size > 0) {
-        problems.push(
-            `${unlocated.size} score box${unlocated.size === 1 ? " was" : "es were"} not where the sheet prints them, so ${unlocated.size === 1 ? "it was" : "they were"} not read. A sheet photographed flat on a table, unfolded, reads best.`
-        )
-    }
-    if (transform.residualPt > 3) {
-        problems.push(
-            "The page looks bent or the photo is at a steep angle; check the numbers carefully."
-        )
-    }
-
-    // A sheet nobody wrote on does not get photographed. Finding no ink at all
-    // means the read failed — the page was located badly enough that every box
-    // sampled blank paper — and reporting a confident "no games played" would
-    // be the worst possible way to be wrong.
-    if (written.length === 0 && blank.length > 0) {
-        problems.push(
-            "No scores were found anywhere on this sheet, which usually means the photo is too angled or blurred to read. Retake it square-on."
-        )
-    }
-
-    const status: ReadStatus = !identity
-        ? "unidentified"
-        : problems.length > 0
-          ? "needs_review"
-          : "read"
 
     return {
-        status,
-        tag: identity?.text ?? null,
-        identity: identity?.parts ?? null,
-        locate,
+        ...base,
+        status: problems.length > 0 ? "needs_review" : "read",
         matches,
-        crops: written,
         problems,
-        transcriber: transcriberName
+        readings
     }
 }

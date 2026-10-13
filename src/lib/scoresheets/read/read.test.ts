@@ -1,404 +1,125 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 
-import type { BoxRect, SheetGeometry } from "../layout"
-import { cropId } from "./crops"
-import { parseSheetTag } from "./identity"
+import type { GameReading, PageReader, PageReading } from "./page-reader"
 import { readSheet } from "./read"
-import { distort } from "./testing/distort"
-import { type GameTruth, synthesizeSheet } from "./testing/synthesize"
-import { nullTranscriber, stubTranscriber } from "./transcriber/stub"
 
-const SCALE = 3000 / 792
-const MATCH_IDS = [900, 901, 902]
+const MATCHES = [
+    { matchId: 101, home: "Team Soo", away: "Team Landeo" },
+    { matchId: 102, home: "Team Pham", away: "Team Stafford" }
+]
 
-/** Two straight games to the home side, a third left unplayed. */
-function twoNil(matchId: number): GameTruth[] {
-    return [
-        { matchId, team: "home", game: 1, score: 25, win: true },
-        { matchId, team: "away", game: 1, score: 19, win: false },
-        { matchId, team: "home", game: 2, score: 25, win: true },
-        { matchId, team: "away", game: 2, score: 21, win: false }
-    ]
-}
+const g = (home: number | null, away: number | null): GameReading => ({
+    home,
+    away,
+    confidence: "high",
+    note: ""
+})
 
-async function photograph(opts: {
-    scores: GameTruth[]
-    seed: number
-    matchCount?: 1 | 2 | 3 | 4
-    /** Fold the page, as the first real photographs were. */
-    curl?: number
-    /** Page rectangles to paint white before photographing. */
-    whiteOut?: (geometry: SheetGeometry) => BoxRect[]
-}) {
-    const sheet = await synthesizeSheet({
-        matchCount: opts.matchCount ?? 3,
-        eventType: "regular_season",
-        scale: SCALE,
-        scores: opts.scores
-    })
-    for (const rect of opts.whiteOut?.(sheet.geometry) ?? []) {
-        const x0 = Math.floor(rect.x * SCALE)
-        const x1 = Math.ceil((rect.x + rect.w) * SCALE)
-        for (
-            let y = Math.floor((792 - rect.y - rect.h) * SCALE);
-            y <= Math.ceil((792 - rect.y) * SCALE);
-            y++
-        ) {
-            sheet.image.gray.fill(
-                255,
-                y * sheet.image.width + x0,
-                y * sheet.image.width + x1
-            )
+const SCORES: GameReading[][] = [
+    [g(22, 25), g(25, 22), g(20, 25)],
+    [g(27, 26), g(25, 19), g(null, null)]
+]
+
+function fake(
+    name: string,
+    answer: Partial<PageReading> | Error = {}
+): PageReader & { calls: number } {
+    return {
+        name,
+        calls: 0,
+        async read({ matches }) {
+            this.calls++
+            if (answer instanceof Error) throw answer
+            expect(matches.map((m) => m.home)).toEqual([
+                "Team Soo",
+                "Team Pham"
+            ])
+            return {
+                model: name,
+                sheetCode: "F26-W5-C1",
+                matches: SCORES,
+                ...answer
+            }
+        },
+        async readCode() {
+            return "F26-W5-C1"
         }
     }
-    const { image } = distort(sheet.image, {
-        seed: opts.seed,
-        perspective: 0.025,
-        rotationDeg: 4,
-        blurSigma: 1,
-        noiseSigma: 4,
-        shading: 0.25,
-        curl: opts.curl
-    })
-    const truth = new Map<string, number | null>(
-        sheet.truth.games.map((g) => [
-            cropId(g.matchId, g.team, g.game),
-            g.score
-        ])
-    )
-    return { image, sheet, truth }
 }
 
-/**
- * These tests synthesize and warp multi-megapixel pages in pure JavaScript,
- * which is inherently slower than the 5-second default allows for on a CI
- * runner. The work is bounded and deliberate, so the ceiling is raised rather
- * than the coverage cut.
- */
-vi.setConfig({ testTimeout: 60_000 })
+const input = (readers: PageReader[]) => ({
+    photo: new Uint8Array([1]),
+    matches: MATCHES,
+    eventType: "regular_season" as const,
+    readers,
+    identity: null,
+    tag: "BSD3:F26:W5:2026-10-08:1",
+    expectedSheetCode: "F26-W5-C1"
+})
 
 describe("readSheet", () => {
-    it("recovers a whole night's scores from a photo", async () => {
-        const scores = MATCH_IDS.flatMap(twoNil)
-        const { image, sheet, truth } = await photograph({ scores, seed: 101 })
+    it("fills a sheet both readers agree on, with nothing to review", async () => {
+        const read = await readSheet(input([fake("a/one"), fake("b/two")]))
 
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: stubTranscriber({ truth })
+        expect(read.status).toBe("read")
+        expect(read.problems).toEqual([])
+        expect(read.transcriber).toBe("a/one + b/two")
+        expect(read.matches.map((m) => m.matchId)).toEqual([101, 102])
+        expect(read.matches[0]).toMatchObject({
+            awayGamesWon: 2,
+            winner: "away"
         })
-
-        expect(result.status).toBe("read")
-        expect(result.tag).toBe(sheet.truth.tag)
-        expect(result.problems).toEqual([])
-        expect(result.matches).toHaveLength(3)
-
-        for (const match of result.matches) {
-            expect(match.homeGamesWon).toBe(2)
-            expect(match.awayGamesWon).toBe(0)
-            expect(match.winner).toBe("home")
-            expect(match.games[0]).toMatchObject({
-                home: 25,
-                away: 19,
-                level: "high"
-            })
-            expect(match.games[2].blank).toBe(true)
-        }
+        expect(read.matches[1].games[2].blank).toBe(true)
+        // Both readings kept whole, for measuring the models later
+        expect(read.readings?.map((r) => r.model)).toEqual(["a/one", "b/two"])
     })
 
-    it("never shows an empty game to the transcriber", async () => {
-        const scores = twoNil(900)
-        const { image, truth } = await photograph({ scores, seed: 102 })
+    it("asks both readers at once, not one after the other", async () => {
+        const one = fake("a/one")
+        const two = fake("b/two")
+        await readSheet(input([one, two]))
+        expect([one.calls, two.calls]).toEqual([1, 1])
+    })
 
-        const asked: string[] = []
-        const spy = stubTranscriber({ truth })
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: {
-                name: "spy",
-                async transcribe(crops, signal) {
-                    asked.push(...crops.map((c) => c.id))
-                    return spy.transcribe(crops, signal)
-                }
-            }
-        })
-
-        // Only match 900's first two games were written in
-        expect(asked.sort()).toEqual(
-            [
-                cropId(900, "home", 1),
-                cropId(900, "away", 1),
-                cropId(900, "home", 2),
-                cropId(900, "away", 2)
-            ].sort()
+    it("carries on with one reader when the other fails, but proves nothing", async () => {
+        const read = await readSheet(
+            input([fake("a/one"), fake("b/two", new Error("returned 429"))])
         )
-        // The untouched matches come back blank, not invented
-        const untouched = result.matches.filter((m) => m.matchId !== 900)
-        for (const match of untouched) {
-            expect(match.games.every((g) => g.blank)).toBe(true)
-        }
+        expect(read.status).toBe("needs_review")
+        expect(read.problems[0]).toBe(
+            "b/two could not read this sheet: returned 429"
+        )
+        expect(read.matches[0].games.every((x) => x.level === "low")).toBe(true)
+        // Scores are still offered, so the admin has less to type
+        expect(read.matches[0].games[0].away).toBe(25)
     })
 
-    it("catches a transcriber that misreads a digit", async () => {
-        const scores = twoNil(900)
-        const { image, truth } = await photograph({ scores, seed: 103 })
-
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            // Claim the home side scored 24, which cannot beat 19
-            transcriber: stubTranscriber({
-                truth,
-                corrupt: new Map([[cropId(900, "home", 1), 24]])
-            })
-        })
-
-        const game = result.matches[0].games[0]
-        // Either corrected by the rules and the tick, or flagged. Never 24.
-        expect(game.home).not.toBe(24)
-        if (game.level === "high") expect(game.home).toBe(25)
-        else expect(result.problems.length).toBeGreaterThan(0)
-    })
-
-    it("still reads the ticks when no model is available", async () => {
-        const scores = twoNil(900)
-        const { image } = await photograph({ scores, seed: 104 })
-
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: nullTranscriber
-        })
-
-        // No digits, so no scoreline, but the sheet is still identified and
-        // the admin gets a partly filled form rather than nothing.
-        expect(result.tag).not.toBeNull()
-        expect(result.status).toBe("needs_review")
-        expect(result.crops.length).toBeGreaterThan(0)
-    })
-
-    it("survives a transcriber that throws", async () => {
-        const scores = twoNil(900)
-        const { image } = await photograph({ scores, seed: 105 })
-
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: stubTranscriber({ truth: new Map(), fail: true })
-        })
-
-        expect(result.transcriber).toContain("failed")
-        expect(result.problems.join(" ")).toContain("could not be read")
-        expect(result.tag).not.toBeNull()
-    })
-
-    it("calls a played game unreadable, not blank, when the model fails", async () => {
-        // Scores written, WIN left unticked — which is most of a real sheet,
-        // since referees tick it inconsistently and a faint tick does not
-        // always survive a photograph. With no tick and no digits, every
-        // signal that a game happened comes from the ink in the boxes.
-        const scores: GameTruth[] = [
-            { matchId: 900, team: "home", game: 1, score: 25, win: false },
-            { matchId: 900, team: "away", game: 1, score: 19, win: false },
-            { matchId: 900, team: "home", game: 2, score: 25, win: false },
-            { matchId: 900, team: "away", game: 2, score: 21, win: false }
-        ]
-        const { image } = await photograph({ scores, seed: 211 })
-
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: stubTranscriber({ truth: new Map(), fail: true })
-        })
-
-        // The failure that matters is not losing the digits, which is
-        // survivable and says so. It is announcing "these games were never
-        // played" at full confidence, which is what a sixty-second timeout
-        // did the first time real photographs went through.
-        for (const game of result.matches[0].games.slice(0, 2)) {
-            expect(game.blank).toBe(false)
-            expect(game.level).toBe("unreadable")
-        }
-    })
-
-    it("reads a sheet that was folded in half", async () => {
-        // The first folded photographs put the FINAL boxes 15-35pt from where
-        // a flat page would, so every crop read the printed tally above them.
-        const scores = MATCH_IDS.flatMap(twoNil)
-        const { image, truth } = await photograph({
-            scores,
-            seed: 106,
-            curl: 0.035
-        })
-
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: stubTranscriber({ truth })
-        })
-
-        // Identity is a separate question (the pipeline also decodes the tag
-        // from the raw photo); here no score may be in doubt.
-        expect(
-            result.problems.filter(
-                (p) => p.startsWith("Match") || p.includes("score box")
-            )
-        ).toEqual([])
-        for (const match of result.matches) {
-            expect(match.games.map((g) => [g.home, g.away, g.blank])).toEqual([
-                [25, 19, false],
-                [25, 21, false],
-                [null, null, true]
+    it("fails the read only when no reader answered", async () => {
+        const read = await readSheet(
+            input([
+                fake("a/one", new Error("timeout")),
+                fake("b/two", new Error("timeout"))
             ])
-        }
+        )
+        expect(read.status).toBe("failed")
+        expect(read.matches).toEqual([])
+        expect(read.problems).toHaveLength(2)
     })
 
-    it("keeps the identity the pipeline already read from the raw photo", async () => {
-        // On 2026-10-08 the tag decoded from all six raw photos but from only
-        // four rectified pages, and the other two were filed "Court unknown"
-        // although their scores had been read against the right matches.
-        const scores = twoNil(900)
-        const { image, sheet } = await photograph({
-            scores,
-            seed: 107,
-            whiteOut: (geometry) => [geometry.tagQr]
-        })
-        const photoTag = {
-            text: sheet.truth.tag,
-            parts: parseSheetTag(sheet.truth.tag)!
-        }
-        const input = {
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season" as const,
-            transcriber: nullTranscriber
-        }
-
-        const alone = await readSheet(input)
-        expect(alone.status).toBe("unidentified")
-
-        const told = await readSheet({ ...input, photoTag })
-        expect(told.status).not.toBe("unidentified")
-        expect(told.tag).toBe(sheet.truth.tag)
-        expect(told.identity?.court).toBe(photoTag.parts.court)
-        expect(told.problems.join(" ")).not.toContain("code could not be read")
+    it("notices a photo filed against the wrong court", async () => {
+        const read = await readSheet(
+            input([fake("a/one", { sheetCode: "F26-W5-C2" }), fake("b/two")])
+        )
+        expect(read.status).toBe("needs_review")
+        expect(read.problems[0]).toContain(
+            "read the sheet's code as F26-W5-C2, but this photo is filed as F26-W5-C1"
+        )
     })
 
-    it("calls a game unreadable, not blank, when its boxes cannot be found", async () => {
-        // Nothing printed is left where the game's boxes were. That is not
-        // an unplayed game: an unplayed game still has its empty boxes.
-        const scores = MATCH_IDS.flatMap(twoNil)
-        const { image, truth } = await photograph({
-            scores,
-            seed: 107,
-            curl: 0.02,
-            whiteOut: (geometry) =>
-                geometry.games
-                    .filter((g) => g.matchId === 901 && g.game === 1)
-                    .map((g) => ({
-                        x: g.finalDigits[0].x - 3,
-                        y: g.finalDigits[0].y - 3,
-                        w: g.win.x + g.win.w - g.finalDigits[0].x + 6,
-                        h: g.finalDigits[0].h + 6
-                    }))
-        })
-
-        const result = await readSheet({
-            image,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: stubTranscriber({ truth })
-        })
-
-        const game = result.matches[1].games[0]
-        expect(game.blank).toBe(false)
-        expect(game.level).toBe("unreadable")
-        expect(result.status).toBe("needs_review")
-        // The rest of the sheet is unaffected
-        expect(result.matches[0].games[0]).toMatchObject({
-            home: 25,
-            away: 19
-        })
+    it("needs no secret to run: with no readers it asks for typing", async () => {
+        const read = await readSheet(input([]))
+        expect(read.status).toBe("needs_review")
+        expect(read.matches).toEqual([])
+        expect(read.problems[0]).toContain("not set up")
     })
-
-    it("reports a photo it cannot place instead of guessing", async () => {
-        const blank = {
-            width: 600,
-            height: 800,
-            gray: new Uint8Array(600 * 800).fill(240)
-        }
-        const result = await readSheet({
-            image: blank,
-            matchIds: MATCH_IDS,
-            eventType: "regular_season",
-            transcriber: nullTranscriber
-        })
-        expect(result.status).toBe("not_located")
-        expect(result.matches).toEqual([])
-    })
-
-    it("is never confidently wrong across seeds and scorelines", async () => {
-        const lines: { home: number; away: number }[] = [
-            { home: 25, away: 19 },
-            { home: 21, away: 25 },
-            { home: 27, away: 25 },
-            { home: 26, away: 24 }
-        ]
-
-        const confidentlyWrong: string[] = []
-        let highFields = 0
-
-        for (const [i, line] of lines.entries()) {
-            const matchId = 900
-            const homeWon = line.home > line.away
-            const scores: GameTruth[] = [
-                {
-                    matchId,
-                    team: "home",
-                    game: 1,
-                    score: line.home,
-                    win: homeWon
-                },
-                {
-                    matchId,
-                    team: "away",
-                    game: 1,
-                    score: line.away,
-                    win: !homeWon
-                }
-            ]
-            const { image, truth } = await photograph({
-                scores,
-                seed: 200 + i,
-                matchCount: 2
-            })
-
-            const result = await readSheet({
-                image,
-                matchIds: [900, 901],
-                eventType: "regular_season",
-                transcriber: stubTranscriber({ truth, confidence: 0.9 })
-            })
-
-            const game = result.matches[0].games[0]
-            if (game.level !== "high") continue
-            highFields++
-            if (game.home !== line.home || game.away !== line.away) {
-                confidentlyWrong.push(
-                    `${line.home}-${line.away} read ${game.home}-${game.away}`
-                )
-            }
-        }
-
-        expect(confidentlyWrong).toEqual([])
-        expect(highFields).toBeGreaterThan(0)
-    }, 60_000)
 })

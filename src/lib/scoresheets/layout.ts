@@ -1,11 +1,12 @@
 /**
  * layout.ts — every rectangle on a score sheet, in PDF points.
  *
- * This module is the single source of truth for the printed geometry. The
- * renderer draws from it today. A future pipeline that reads photographed
- * sheets should import it too, rather than re-deriving coordinates: the four
- * corner fiducials give a photo a coordinate system, and the boxes below are
- * expressed in that same system, so the two can never drift apart.
+ * This module is the single source of truth for the printed geometry; the
+ * renderer draws only from it. The photo reader no longer uses it: it sends
+ * the whole photo to vision models, which read the page as a person would.
+ * The corner marks it places date from an earlier reader that located the
+ * page by them, and are kept because they cost nothing and the sheet's
+ * layout is familiar to referees.
  *
  * Coordinates follow pdf-lib: origin bottom-left, y increases upward, and a
  * rect's `y` is its BOTTOM edge.

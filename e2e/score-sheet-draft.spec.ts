@@ -22,8 +22,8 @@ import { PERSONAS } from "./helpers"
 
 // A read that has already happened is seeded directly, so this exercises the
 // product surface — the banner, filling in, and saving — without needing R2,
-// a model, or a photograph. The imaging itself is covered far more thoroughly
-// by the property tests in src/lib/scoresheets/read.
+// a model, or a photograph. Reading itself is covered by the unit and
+// integration tests in src/lib/scoresheets/read.
 
 function todayUTC(): string {
     return new Date().toISOString().split("T")[0]

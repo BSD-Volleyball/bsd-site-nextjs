@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { flaggedFieldCount, toScoreDraft } from "./draft"
 import type { MatchRead } from "./read"
-import type { GameVerdict } from "./reconcile"
+import type { GameVerdict } from "./combine"
 
 const game = (over: Partial<GameVerdict> = {}): GameVerdict => ({
     home: null,
@@ -92,11 +92,11 @@ describe("toScoreDraft", () => {
             level: "low",
             confidence: 0.5,
             blank: false,
-            conflict: "The WIN tick says away won, but the scores read 25-19."
+            conflict: "A reader was unsure of this game. The 9 is overwritten."
         })
         const draft = toScoreDraft(match([conflicted, game(), game()]))
         expect(draft.flags[0].level).toBe("conflict")
-        expect(draft.flags[0].note).toContain("WIN tick")
+        expect(draft.flags[0].note).toContain("overwritten")
     })
 
     it("withholds the totals when a game could not be read", () => {

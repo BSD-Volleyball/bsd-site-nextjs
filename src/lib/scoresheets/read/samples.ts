@@ -1,14 +1,17 @@
 /**
- * samples.ts — keep the cropped score boxes, and learn what they said.
+ * samples.ts — record what the reader said, and learn what was saved.
  *
- * Every sheet an admin confirms is free training data: an image of two
- * handwritten digits, and the number a human agreed they were. Enough of
- * these and a small classifier can be trained on how this league's referees
- * actually write, which is the way off a hosted model and onto something that
- * costs nothing and runs in-process.
+ * One row per team per game: what the readers concluded, and later what the
+ * league actually saved for it. That is the running scorecard for the models.
+ * The bake-off that chose them was 12 sheets; this measures every sheet after,
+ * so a model that quietly gets worse, or a better one worth switching to, shows
+ * up in the numbers rather than in a wrong standings table.
+ *
+ * Each row points at the photo it came from (`image_path`). Rows written by
+ * the earlier reader point at a cropped box in the private bucket instead.
  *
  * Kept deliberately cheap and deliberately optional. A failure here never
- * affects a read: the scores are the point, the corpus is a by-product.
+ * affects a read: the scores are the point, the record is a by-product.
  */
 
 import { and, eq, inArray, isNull, ne } from "drizzle-orm"
@@ -20,70 +23,51 @@ import {
     scoreSheetScoreSamples
 } from "@/database/schema"
 import { logger } from "@/lib/logger"
-import { putR2Object } from "@/lib/r2"
 
-import type { ScoreCrop } from "./crops"
 import type { SheetRead } from "./read"
 
-const PREFIX = "scoresheet-samples"
-
-/** Which game and side a crop id refers to. */
-function parseCropId(
-    id: string
-): { matchId: number; team: "home" | "away"; game: 1 | 2 | 3 } | null {
-    const [matchId, team, game] = id.split(":")
-    const parsedMatch = Number.parseInt(matchId, 10)
-    const parsedGame = Number.parseInt(game, 10)
-    if (!Number.isInteger(parsedMatch)) return null
-    if (team !== "home" && team !== "away") return null
-    if (parsedGame < 1 || parsedGame > 3) return null
-    return {
-        matchId: parsedMatch,
-        team,
-        game: parsedGame as 1 | 2 | 3
-    }
-}
-
-/** What the reader made of a given crop, for recording alongside it. */
-function predictionFor(read: SheetRead, cropId: string): number | null {
-    const parsed = parseCropId(cropId)
-    if (!parsed) return null
-    const match = read.matches.find((m) => m.matchId === parsed.matchId)
-    const game = match?.games[parsed.game - 1]
-    if (!game) return null
-    return parsed.team === "home" ? game.home : game.away
+/** `${matchId}:${team}:${game}`, one team's score in one game. */
+export function sampleId(
+    matchId: number,
+    team: "home" | "away",
+    game: 1 | 2 | 3
+): string {
+    return `${matchId}:${team}:${game}`
 }
 
 /**
- * Store each cropped box and what the reader thought it said. Called after a
- * read; the confirmed answer arrives later, if it ever does.
+ * Store what the reader concluded for every game it saw played. Called after
+ * a read; the confirmed answer arrives later, if it ever does. Blank games are
+ * left out: there is no number to be right or wrong about.
  */
 export async function storeScoreSamples(
     readId: number,
     read: SheetRead,
-    crops: readonly ScoreCrop[]
+    photoPath: string
 ): Promise<void> {
-    if (crops.length === 0) return
+    const rows: (typeof scoreSheetScoreSamples.$inferInsert)[] = []
+    for (const match of read.matches) {
+        match.games.forEach((game, index) => {
+            if (game.blank) return
+            for (const team of ["home", "away"] as const) {
+                rows.push({
+                    read_id: readId,
+                    crop_id: sampleId(
+                        match.matchId,
+                        team,
+                        (index + 1) as 1 | 2 | 3
+                    ),
+                    match_id: match.matchId,
+                    image_path: photoPath,
+                    predicted: team === "home" ? game.home : game.away,
+                    predicted_confidence: String(game.confidence)
+                })
+            }
+        })
+    }
+    if (rows.length === 0) return
 
     try {
-        const rows: (typeof scoreSheetScoreSamples.$inferInsert)[] = []
-        for (const crop of crops) {
-            const key = `${PREFIX}/${readId}/${crop.id.replace(/:/g, "_")}.png`
-            await putR2Object({
-                key,
-                body: Buffer.from(crop.png),
-                contentType: "image/png",
-                scope: "private"
-            })
-            rows.push({
-                read_id: readId,
-                crop_id: crop.id,
-                match_id: crop.matchId,
-                image_path: key,
-                predicted: predictionFor(read, crop.id)
-            })
-        }
-
         await db
             .insert(scoreSheetScoreSamples)
             .values(rows)

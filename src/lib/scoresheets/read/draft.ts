@@ -7,12 +7,12 @@
  * live and lib has no business guessing which team "Winner of M1" turned out
  * to be.
  *
- * Nothing here decides anything. Every value came from reconciliation, which
- * has already weighed the digits against the ticks and the rules; this only
- * lays them out and says which ones a human should look at.
+ * Nothing here decides anything. Every value came from `combine.ts`, which
+ * has already weighed the two readers against each other and the rules; this
+ * only lays them out and says which ones a human should look at.
  */
 
-import type { ReadLevel } from "./reconcile"
+import type { ReadLevel } from "./combine"
 import type { MatchRead, SheetRead } from "./read"
 
 interface ScoreDraftFields {
