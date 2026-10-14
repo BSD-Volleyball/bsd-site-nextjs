@@ -1,6 +1,11 @@
 {
     "installCommand": "pnpm install --frozen-lockfile",
     "buildCommand": "pnpm build",
+    "git": {
+        "deploymentEnabled": {
+            "dependabot/**": false
+        }
+    },
     "crons": [
         {
             "path": "/api/cron/game-reminders",
