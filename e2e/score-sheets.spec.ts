@@ -114,7 +114,10 @@ test.describe("score sheets", () => {
         ).toBeVisible()
 
         const downloadPromise = page.waitForEvent("download")
-        await page.getByRole("link", { name: "Score sheets" }).first().click()
+        await page
+            .getByRole("link", { name: "Score sheets", exact: true })
+            .first()
+            .click()
         const download = await downloadPromise
 
         expect(download.suggestedFilename()).toBe(`scoresheets-${NIGHT}.pdf`)
