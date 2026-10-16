@@ -27,8 +27,9 @@ interface Props {
 
 /**
  * Two-step presigned upload shared by Manage Sponsors and the sponsor's own
- * page. Logos are uploaded as-is (no JPEG recompression) so PNG and SVG
- * transparency survives for the t-shirt printer.
+ * page. Logos are uploaded as-is (no JPEG recompression) so PNG transparency
+ * survives for the t-shirt printer. SVG is not accepted: it can carry script
+ * and the pictures domain serves it as stored.
  */
 export function SponsorLogoUploader({
     sponsorId,
@@ -92,7 +93,7 @@ export function SponsorLogoUploader({
                 className={`${box} flex shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white p-1`}
             >
                 {preview ? (
-                    // Plain img: logos may be SVG, which next/image won't optimise.
+                    // Plain img: older logos may be SVG, which next/image won't optimise.
                     <img
                         src={preview}
                         alt={`${sponsorName} logo`}
@@ -126,8 +127,8 @@ export function SponsorLogoUploader({
                           : "Upload logo"}
                 </Button>
                 <p className="text-muted-foreground text-xs">
-                    PNG, JPEG, SVG, or WebP, up to 2 MB. Transparent PNG or SVG
-                    works best on the shirt.
+                    PNG, JPEG, or WebP, up to 2 MB. Transparent PNG works best
+                    on the shirt; send the vector file to us separately.
                 </p>
             </div>
         </div>

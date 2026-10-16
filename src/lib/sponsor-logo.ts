@@ -12,10 +12,12 @@ const SPONSOR_LOGO_OBJECT_PREFIX = "sponsorlogos"
 // separately, so the web copy never needs to be print resolution.
 export const SPONSOR_LOGO_MAX_BYTES = 2 * 1024 * 1024
 
+// Raster only. SVG can carry script, and the pictures domain serves objects
+// as stored; the sponsor contact who uploads a logo is not staff. The
+// printer gets the vector file separately.
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
     "image/png": "png",
     "image/jpeg": "jpg",
-    "image/svg+xml": "svg",
     "image/webp": "webp"
 }
 
@@ -36,7 +38,7 @@ export function buildSponsorLogoFilename(
     return `${sponsorId}-${nonce}.${extension}`
 }
 
-const FILENAME_PATTERN = /^(\d+)-(\d+)\.(png|jpg|svg|webp)$/
+const FILENAME_PATTERN = /^(\d+)-(\d+)\.(png|jpg|webp)$/
 
 /**
  * Finalize receives the filename back from the browser, so it must be

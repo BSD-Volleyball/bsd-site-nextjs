@@ -329,7 +329,7 @@ export async function issueSponsorLogoUpload(params: {
 }): Promise<{ uploadUrl: string; filename: string }> {
     const extension = getSponsorLogoExtension(params.contentType)
     if (!extension) {
-        throw new ActionError("Logo must be a PNG, JPEG, SVG, or WebP image.")
+        throw new ActionError("Logo must be a PNG, JPEG, or WebP image.")
     }
     if (
         !Number.isInteger(params.contentLength) ||

@@ -93,8 +93,13 @@ export async function createPlayerPictureUploadPresignedUrl(params: {
         CacheControl: "no-cache"
     })
 
+    // The presigner leaves Content-Type unsigned by default (browsers used
+    // to mangle it). Unsigned, the holder of this URL could store the bytes
+    // as text/html and the public pictures domain would serve them as a
+    // page. Every uploader here sets the header explicitly, so sign it.
     return getSignedUrl(getR2Client(), command, {
-        expiresIn: UPLOAD_TTL_SECONDS
+        expiresIn: UPLOAD_TTL_SECONDS,
+        signableHeaders: new Set(["content-type"])
     })
 }
 

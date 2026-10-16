@@ -13,12 +13,13 @@ describe("sponsor logo helpers", () => {
     it("maps allowed content types to file extensions", () => {
         expect(getSponsorLogoExtension("image/png")).toBe("png")
         expect(getSponsorLogoExtension("image/jpeg")).toBe("jpg")
-        expect(getSponsorLogoExtension("image/svg+xml")).toBe("svg")
         expect(getSponsorLogoExtension("image/webp")).toBe("webp")
     })
 
     it("rejects content types that are not logo images", () => {
         expect(getSponsorLogoExtension("image/gif")).toBeNull()
+        // SVG can carry script and is served as stored from the pictures domain.
+        expect(getSponsorLogoExtension("image/svg+xml")).toBeNull()
         expect(getSponsorLogoExtension("application/pdf")).toBeNull()
         expect(getSponsorLogoExtension("")).toBeNull()
     })
@@ -44,6 +45,7 @@ describe("sponsor logo helpers", () => {
         expect(isSponsorLogoFilenameFor(12, "13-1700000000000.png")).toBe(false)
         expect(isSponsorLogoFilenameFor(12, "12-abc.png")).toBe(false)
         expect(isSponsorLogoFilenameFor(12, "12-1.exe")).toBe(false)
+        expect(isSponsorLogoFilenameFor(12, "12-1.svg")).toBe(false)
         expect(isSponsorLogoFilenameFor(12, "../12-1.png")).toBe(false)
     })
 

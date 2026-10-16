@@ -227,11 +227,11 @@ describe("sponsor logo upload by the contact", () => {
         const { contact, sponsor } = await seedPendingSponsorship()
         loginAs(contact)
 
-        const start = await createMySponsorLogoUpload("image/svg+xml", 2048)
+        const start = await createMySponsorLogoUpload("image/png", 2048)
         expect(start.status).toBe(true)
         if (!start.status) return
         expect(start.data.filename).toMatch(
-            new RegExp(`^${sponsor.id}-\\d+\\.svg$`)
+            new RegExp(`^${sponsor.id}-\\d+\\.png$`)
         )
 
         const done = await finalizeMySponsorLogoUpload(start.data.filename)
