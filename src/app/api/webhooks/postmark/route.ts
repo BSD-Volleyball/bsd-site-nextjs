@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { timingSafeEqual } from "node:crypto"
+import { createHash, timingSafeEqual } from "node:crypto"
 import { logger } from "@/lib/logger"
 import {
     handleBounce,
@@ -48,10 +48,14 @@ function verifyWebhookAuth(request: NextRequest): boolean {
     const providedUser = decoded.slice(0, sepIdx)
     const providedPassword = decoded.slice(sepIdx + 1)
 
-    const expected = Buffer.from(`${user}:${password}`, "utf-8")
-    const provided = Buffer.from(`${providedUser}:${providedPassword}`, "utf-8")
-    if (expected.length !== provided.length) return false
-    return timingSafeEqual(expected, provided)
+    // Hash both sides so the compare takes the same time whatever the
+    // length of what was sent, as the inbound Worker does.
+    const digest = (value: string) =>
+        createHash("sha256").update(value, "utf-8").digest()
+    return timingSafeEqual(
+        digest(`${user}:${password}`),
+        digest(`${providedUser}:${providedPassword}`)
+    )
 }
 
 // ---------------------------------------------------------------------------

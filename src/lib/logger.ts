@@ -29,10 +29,12 @@ function emit(
     error?: unknown
 ): void {
     if (process.env.NODE_ENV === "production") {
+        // Context first, so a context key named level or message cannot
+        // relabel the entry.
         const entry: Record<string, unknown> = {
+            ...context,
             level,
             message,
-            ...context,
             ...(error !== undefined ? { error: serializeError(error) } : {}),
             timestamp: new Date().toISOString()
         }

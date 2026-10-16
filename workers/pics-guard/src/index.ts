@@ -52,7 +52,14 @@ async function serveSponsorLogo(
             headers: { allow: "GET, HEAD" }
         })
     }
-    const object = await env.PICS.get(decodeURIComponent(path.slice(1)))
+    let key: string
+    try {
+        key = decodeURIComponent(path.slice(1))
+    } catch {
+        // Malformed percent-encoding is a bad request, not a crash.
+        return notFound()
+    }
+    const object = await env.PICS.get(key)
     if (!object) return notFound()
 
     const headers = new Headers()

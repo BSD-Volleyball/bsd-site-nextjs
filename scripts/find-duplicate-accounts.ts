@@ -39,8 +39,7 @@ interface Account {
 
 async function main() {
     const c = new Client({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
+        connectionString: process.env.DATABASE_URL
     })
     await c.connect()
 

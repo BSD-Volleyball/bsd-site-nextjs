@@ -19,6 +19,15 @@ function field(value: unknown): string | undefined {
     return typeof value === "string" ? value.slice(0, 300) : undefined
 }
 
+/**
+ * A URL field without its query or fragment: a violation on a reset or
+ * verification page would otherwise write the token into the logs.
+ */
+function urlField(value: unknown): string | undefined {
+    const text = field(value)
+    return text?.replace(/[?#].*$/, "")
+}
+
 export async function POST(request: Request) {
     const length = Number(request.headers.get("content-length") ?? 0)
     if (length > MAX_BODY_BYTES) return new Response(null, { status: 413 })
@@ -52,9 +61,9 @@ export async function POST(request: Request) {
                     r.effectiveDirective ??
                     r["violated-directive"]
             ),
-            blocked: field(r["blocked-uri"] ?? r.blockedURL),
-            page: field(r["document-uri"] ?? r.documentURL),
-            source: field(r["source-file"] ?? r.sourceFile),
+            blocked: urlField(r["blocked-uri"] ?? r.blockedURL),
+            page: urlField(r["document-uri"] ?? r.documentURL),
+            source: urlField(r["source-file"] ?? r.sourceFile),
             disposition: field(r.disposition)
         })
     }

@@ -2,6 +2,7 @@ import "server-only"
 import { ServerClient } from "postmark"
 import { isLegacyEmail } from "@/lib/legacy-matching"
 import { logger } from "@/lib/logger"
+import { maskEmail } from "@/lib/inbound/delivery-events"
 
 // ---------------------------------------------------------------------------
 // Postmark Message Stream IDs
@@ -312,7 +313,7 @@ export async function sendBatchEmails(
             } else {
                 failed++
                 logger.error("[postmark] Batch send error", {
-                    to: r.To,
+                    to: r.To ? maskEmail(r.To) : undefined,
                     errorCode: r.ErrorCode,
                     postmarkMessage: r.Message
                 })

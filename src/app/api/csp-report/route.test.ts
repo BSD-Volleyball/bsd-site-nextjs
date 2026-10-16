@@ -37,6 +37,28 @@ describe("POST /api/csp-report", () => {
         })
     })
 
+    it("drops the query and fragment from URLs, where tokens live", async () => {
+        const res = await post(
+            JSON.stringify({
+                "csp-report": {
+                    "document-uri":
+                        "https://league.example/auth/reset-password?token=SECRET#x",
+                    "effective-directive": "img-src",
+                    "blocked-uri": "https://evil.example/p.gif?u=SECRET2"
+                }
+            })
+        )
+        expect(res.status).toBe(204)
+        expect(warn).toHaveBeenLastCalledWith(
+            "[csp] Violation reported",
+            expect.objectContaining({
+                page: "https://league.example/auth/reset-password",
+                blocked: "https://evil.example/p.gif"
+            })
+        )
+        expect(JSON.stringify(warn.mock.lastCall)).not.toContain("SECRET")
+    })
+
     it("accepts Reporting API batches", async () => {
         warn.mockClear()
         const res = await post(

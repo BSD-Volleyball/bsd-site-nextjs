@@ -43,6 +43,11 @@ describe("sponsor logos", () => {
         expect(response.headers.get("x-content-type-options")).toBe("nosniff")
     })
 
+    it("answers 404, not 500, to malformed percent-encoding", async () => {
+        const response = await SELF.fetch(`${HOST}/sponsorlogos/7-1%E0.svg`)
+        expect(response.status).toBe(404)
+    })
+
     it("answers 404 for a missing logo and 405 for writes", async () => {
         expect(
             (await SELF.fetch(`${HOST}/sponsorlogos/missing.png`)).status

@@ -81,13 +81,10 @@ const nextConfig: NextConfig = {
     /* config options here */
     images: {
         minimumCacheTTL: 31536000,
-        remotePatterns: [
-            // Cloudflare R2 default public bucket domains
-            { protocol: "https", hostname: "*.r2.dev" },
-            { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
-            // Dynamic pattern from PLAYER_PIC_URL env var if set
-            ...(playerPicRemotePattern ? [playerPicRemotePattern] : [])
-        ]
+        // Only the pictures host. A wildcard such as *.r2.dev would let
+        // /_next/image optimise any Cloudflare customer's public bucket on
+        // this project's bill.
+        remotePatterns: playerPicRemotePattern ? [playerPicRemotePattern] : []
     },
     async headers() {
         return [

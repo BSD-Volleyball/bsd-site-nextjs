@@ -17,4 +17,8 @@ async function runMigration() {
     await pool.end()
 }
 
-runMigration().catch(console.error)
+runMigration().catch((error) => {
+    console.error(error)
+    // A failed migration must fail the step that ran it.
+    process.exitCode = 1
+})
