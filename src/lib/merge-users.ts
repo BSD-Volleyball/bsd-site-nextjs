@@ -19,6 +19,7 @@ import {
     inboundEmailReplies,
     inboundEmails,
     matchReferees,
+    matches,
     matchSubstitutions,
     movingDay,
     notificationOptouts,
@@ -521,6 +522,12 @@ export async function mergeUserRecords(
             .update(draftPairDiffs)
             .set({ player2: newUserId })
             .where(eq(draftPairDiffs.player2, oldUserId))
+
+        // matches
+        await tx
+            .update(matches)
+            .set({ scores_entered_by: newUserId })
+            .where(eq(matches.scores_entered_by, oldUserId))
 
         // score_sheets
         await tx

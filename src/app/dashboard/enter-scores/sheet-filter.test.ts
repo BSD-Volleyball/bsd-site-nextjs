@@ -13,25 +13,33 @@ const byDivision: ScoreSheetData = {
     id: 10,
     divisionId: 1,
     court: null,
-    imagePath: "a"
+    imagePath: "a",
+    uploadedBy: "Pat Smith",
+    uploadedAt: "2026-10-05T01:31:00.000Z"
 }
 const byCourt2: ScoreSheetData = {
     id: 11,
     divisionId: null,
     court: 2,
-    imagePath: "b"
+    imagePath: "b",
+    uploadedBy: "Pat Smith",
+    uploadedAt: "2026-10-05T01:31:00.000Z"
 }
 const byCourt3: ScoreSheetData = {
     id: 12,
     divisionId: null,
     court: 3,
-    imagePath: "c"
+    imagePath: "c",
+    uploadedBy: "Pat Smith",
+    uploadedAt: "2026-10-05T01:31:00.000Z"
 }
 const unidentified: ScoreSheetData = {
     id: 13,
     divisionId: null,
     court: null,
-    imagePath: "d"
+    imagePath: "d",
+    uploadedBy: "Pat Smith",
+    uploadedAt: "2026-10-05T01:31:00.000Z"
 }
 const all = [byDivision, byCourt2, byCourt3, unidentified]
 

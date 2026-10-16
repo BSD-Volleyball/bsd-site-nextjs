@@ -4,13 +4,14 @@ import { randomUUID } from "node:crypto"
 import { and, desc, eq, inArray } from "drizzle-orm"
 
 import { db } from "@/database/db"
-import { scoreSheetReads, scoreSheets } from "@/database/schema"
+import { scoreSheetReads, scoreSheets, users } from "@/database/schema"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     PLAYER_PICTURE_MAX_BYTES,
     createPlayerPictureUploadPresignedUrl,
     getR2Object
 } from "@/lib/r2"
+import { shortPersonName } from "@/lib/scores/entered-by"
 import type { SheetRead } from "@/lib/scoresheets/read/read"
 import {
     getScoreSheetRead,
@@ -27,6 +28,11 @@ import {
     withAction
 } from "@/next/action-helpers"
 import { getSessionUserId } from "@/next/session"
+
+import {
+    type DivisionMatchGroup,
+    getMatchesForDate
+} from "../enter-scores/actions"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -51,6 +57,70 @@ export interface SheetInboxRow {
     problems: string[]
     attempts: number
     uploadedAt: string
+    uploadedBy: string
+    /** What the readers concluded, once they have. */
+    read: SheetRead | null
+    /** ISO time the latest read began, to tell a live read from a dead one. */
+    readStartedAt: string | null
+}
+
+async function loadInboxRows(
+    seasonId: number,
+    day: string
+): Promise<SheetInboxRow[]> {
+    const rows = await db
+        .select({
+            id: scoreSheets.id,
+            imagePath: scoreSheets.image_path,
+            court: scoreSheets.court,
+            uploadedAt: scoreSheets.uploaded_at,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name
+        })
+        .from(scoreSheets)
+        .innerJoin(users, eq(users.id, scoreSheets.uploaded_by))
+        .where(
+            and(
+                eq(scoreSheets.season_id, seasonId),
+                eq(scoreSheets.match_date, day)
+            )
+        )
+        .orderBy(desc(scoreSheets.uploaded_at))
+
+    if (rows.length === 0) return []
+
+    const reads = await db
+        .select()
+        .from(scoreSheetReads)
+        .where(
+            inArray(
+                scoreSheetReads.score_sheet_id,
+                rows.map((r) => r.id)
+            )
+        )
+    const readBySheet = new Map(reads.map((r) => [r.score_sheet_id, r]))
+
+    return rows.map((row) => {
+        const read = readBySheet.get(row.id)
+        return {
+            scoreSheetId: row.id,
+            imagePath: row.imagePath,
+            court: row.court,
+            status: (read?.status ?? "pending") as StoredReadStatus,
+            tag: read?.tag ?? null,
+            problems: read?.problems ?? [],
+            attempts: read?.attempts ?? 0,
+            uploadedAt: row.uploadedAt.toISOString(),
+            uploadedBy: shortPersonName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            ),
+            read: (read?.result as SheetRead | null) ?? null,
+            readStartedAt: read?.started_at?.toISOString() ?? null
+        }
+    })
 }
 
 export const getSheetInbox = withAction(
@@ -59,53 +129,30 @@ export const getSheetInbox = withAction(
         await requirePermission("scores:enter", {
             seasonId: config.seasonId
         })
-        const seasonId = config.seasonId
+        return ok(await loadInboxRows(config.seasonId, requireDate(date)))
+    }
+)
+
+export interface ScoringNight {
+    divisions: DivisionMatchGroup[]
+    rows: SheetInboxRow[]
+}
+
+/** Everything the upload page shows for a night, in one round trip. */
+export const getScoringNight = withAction(
+    async (date: string): Promise<ActionResult<ScoringNight>> => {
+        const config = await requireSeasonConfig()
+        await requirePermission("scores:enter", {
+            seasonId: config.seasonId
+        })
         const day = requireDate(date)
 
-        const rows = await db
-            .select({
-                id: scoreSheets.id,
-                imagePath: scoreSheets.image_path,
-                court: scoreSheets.court,
-                uploadedAt: scoreSheets.uploaded_at
-            })
-            .from(scoreSheets)
-            .where(
-                and(
-                    eq(scoreSheets.season_id, seasonId),
-                    eq(scoreSheets.match_date, day)
-                )
-            )
-            .orderBy(desc(scoreSheets.uploaded_at))
-
-        if (rows.length === 0) return ok([])
-
-        const reads = await db
-            .select()
-            .from(scoreSheetReads)
-            .where(
-                inArray(
-                    scoreSheetReads.score_sheet_id,
-                    rows.map((r) => r.id)
-                )
-            )
-        const readBySheet = new Map(reads.map((r) => [r.score_sheet_id, r]))
-
-        return ok(
-            rows.map((row) => {
-                const read = readBySheet.get(row.id)
-                return {
-                    scoreSheetId: row.id,
-                    imagePath: row.imagePath,
-                    court: row.court,
-                    status: (read?.status ?? "pending") as StoredReadStatus,
-                    tag: read?.tag ?? null,
-                    problems: read?.problems ?? [],
-                    attempts: read?.attempts ?? 0,
-                    uploadedAt: row.uploadedAt.toISOString()
-                }
-            })
-        )
+        const night = await getMatchesForDate(day)
+        if (!night.status) return fail(night.message)
+        return ok({
+            divisions: night.data.divisions,
+            rows: await loadInboxRows(config.seasonId, day)
+        })
     }
 )
 

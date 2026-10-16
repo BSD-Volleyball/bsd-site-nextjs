@@ -1,5 +1,6 @@
 "use client"
 
+import { formatEnteredTime } from "@/lib/scores/entered-by"
 import { formatMatchTime } from "@/lib/season-utils"
 import type { MatchScoreData } from "./actions"
 import type { MatchFormState } from "./match-form-state"
@@ -66,6 +67,13 @@ export function MatchScoreEntry({
                 <div className="mb-2 flex items-center gap-3 text-muted-foreground text-sm">
                     {match.time && <span>{formatMatchTime(match.time)}</span>}
                     {match.court !== null && <span>Court {match.court}</span>}
+                    {match.scoresEnteredBy && (
+                        <span className="ml-auto text-xs">
+                            Saved by {match.scoresEnteredBy}
+                            {formatEnteredTime(match.scoresEnteredAt) &&
+                                ` · ${formatEnteredTime(match.scoresEnteredAt)}`}
+                        </span>
+                    )}
                 </div>
             )}
 

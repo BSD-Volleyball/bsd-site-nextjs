@@ -9,11 +9,11 @@ import { requireSessionOrRedirect } from "@/next/page-guards"
 import { hasPermissionBySession } from "@/next/session"
 
 import { getMatchDatesForSeason } from "../enter-scores/data"
-import { getSheetInbox } from "./actions"
-import { ScoreSheetInboxClient } from "./score-sheet-inbox-client"
+import { getScoringNight } from "./actions"
+import { UploadScoreSheetsClient } from "./upload-score-sheets-client"
 
 export const metadata: Metadata = {
-    title: "Score Sheet Photos"
+    title: "Upload Score Sheets"
 }
 
 /**
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
  */
 export const maxDuration = 300
 
-export default async function ScoreSheetInboxPage() {
+export default async function UploadScoreSheetsPage() {
     await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
@@ -44,23 +44,25 @@ export default async function ScoreSheetInboxPage() {
         else break
     }
 
-    const inbox = defaultDate ? await getSheetInbox(defaultDate) : null
+    const night = defaultDate ? await getScoringNight(defaultDate) : null
 
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Score Sheet Photos"
-                description="Photograph each court's sheet at the end of the night, or drop them in from a computer. Each sheet says which court it is, so they file themselves, and whatever can be read is offered as a draft on Enter Scores for you to check and save."
+                title="Upload Score Sheets"
+                description="Photograph each court's sheet at the end of the night. Each one files itself under its court; check what was read and save it, or fix anything unclear right on the card."
             />
             {matchDates.length === 0 ? (
                 <StatusBanner variant="error">
                     No match dates found for the current season.
                 </StatusBanner>
             ) : (
-                <ScoreSheetInboxClient
+                <UploadScoreSheetsClient
                     matchDates={matchDates}
                     defaultDate={defaultDate}
-                    initialRows={inbox?.status ? inbox.data : []}
+                    initialNight={
+                        night?.status ? night.data : { divisions: [], rows: [] }
+                    }
                     picBaseUrl={playerPicBaseUrl()}
                 />
             )}

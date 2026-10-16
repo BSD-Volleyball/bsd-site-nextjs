@@ -2,7 +2,11 @@ import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { db } from "@/database/db"
-import { scoreSheetReads, scoreSheets } from "@/database/schema"
+import {
+    individual_divisions,
+    scoreSheetReads,
+    scoreSheets
+} from "@/database/schema"
 import { getR2Object } from "@/lib/r2"
 import {
     createDivision,
@@ -13,10 +17,13 @@ import {
 } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
 
+import { saveScoresForDivision } from "../enter-scores/actions"
+
 import {
     createSheetUpload,
     deleteUploadedSheet,
     finalizeSheetUpload,
+    getScoringNight,
     getSheetInbox,
     peekSheetRead,
     readUploadedSheet
@@ -49,7 +56,7 @@ async function seedNight() {
         court: 1,
         home_team: home.id
     })
-    return season.id
+    return { seasonId: season.id, divisionId: division.id, homeId: home.id }
 }
 
 /** Pretend the presigned PUT landed. */
@@ -78,6 +85,7 @@ describe("score sheet inbox actions", () => {
 
             for (const result of [
                 await getSheetInbox(NIGHT),
+                await getScoringNight(NIGHT),
                 await createSheetUpload({ date: NIGHT, contentLength: 100 }),
                 await finalizeSheetUpload({ date: NIGHT, objectKey: "x" }),
                 await readUploadedSheet({ scoreSheetId: 1 }),
@@ -107,7 +115,7 @@ describe("score sheet inbox actions", () => {
 
     describe("uploading", () => {
         it("hands back a presigned target under the night's own prefix", async () => {
-            const seasonId = await seedNight()
+            const { seasonId } = await seedNight()
             await createUserWithRoles([{ role: "admin" }])
 
             const ticket = await createSheetUpload({
@@ -154,7 +162,7 @@ describe("score sheet inbox actions", () => {
         })
 
         it("refuses to record an upload that never arrived", async () => {
-            const seasonId = await seedNight()
+            const { seasonId } = await seedNight()
             await createUserWithRoles([{ role: "admin" }])
             mockedGetR2.mockResolvedValue(null)
 
@@ -167,8 +175,12 @@ describe("score sheet inbox actions", () => {
         })
 
         it("records an arrived upload as pending and lists it", async () => {
-            const seasonId = await seedNight()
-            await createUserWithRoles([{ role: "admin" }])
+            const { seasonId } = await seedNight()
+            await createUserWithRoles([{ role: "admin" }], {
+                first_name: "Patricia",
+                last_name: "Smith",
+                preferred_name: "Pat"
+            })
             storeExists()
 
             const key = `scoresheets/${seasonId}/${NIGHT}/sheet_b.jpg`
@@ -197,14 +209,64 @@ describe("score sheet inbox actions", () => {
             expect(inbox.data[0]).toMatchObject({
                 status: "pending",
                 court: null,
-                imagePath: key
+                imagePath: key,
+                uploadedBy: "Pat Smith",
+                read: null
             })
+        })
+    })
+
+    describe("the night", () => {
+        it("returns the matches with who saved each, and the photos", async () => {
+            const { seasonId, divisionId, homeId } = await seedNight()
+            await db.insert(individual_divisions).values({
+                season: seasonId,
+                division: divisionId,
+                gender_split: "5-3",
+                teams: 2
+            })
+            await createUserWithRoles([{ role: "admin" }], {
+                first_name: "Robin",
+                last_name: "Lee"
+            })
+            storeExists()
+            await finalizeSheetUpload({
+                date: NIGHT,
+                objectKey: `scoresheets/${seasonId}/${NIGHT}/sheet_c.jpg`
+            })
+
+            const before = await getScoringNight(NIGHT)
+            expect(before.status).toBe(true)
+            if (!before.status) return
+            const [match] = before.data.divisions[0].matches
+            expect(match.scoresEnteredBy).toBeNull()
+            expect(before.data.rows[0].uploadedBy).toBe("Robin Lee")
+
+            await saveScoresForDivision(divisionId, NIGHT, [
+                {
+                    matchId: match.matchId,
+                    homeScore: 2,
+                    awayScore: 0,
+                    homeSet1Score: 25,
+                    awaySet1Score: 20,
+                    homeSet2Score: 25,
+                    awaySet2Score: 21,
+                    homeSet3Score: null,
+                    awaySet3Score: null,
+                    winner: homeId
+                }
+            ])
+            const after = await getScoringNight(NIGHT)
+            if (!after.status) throw new Error(after.message)
+            const [saved] = after.data.divisions[0].matches
+            expect(saved.scoresEnteredBy).toBe("Robin Lee")
+            expect(saved.scoresEnteredAt).not.toBeNull()
         })
     })
 
     describe("removing", () => {
         it("deletes an upload and its read together", async () => {
-            const seasonId = await seedNight()
+            const { seasonId } = await seedNight()
             await createUserWithRoles([{ role: "admin" }])
             storeExists()
 

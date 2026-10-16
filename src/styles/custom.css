@@ -73,3 +73,34 @@ html {
     animation: marquee-vertical var(--duration) linear infinite;
   }
 }
+
+/* Score sheet upload: a line sweeping the photo while the readers work */
+@keyframes sheet-scan {
+  0%,
+  100% {
+    top: 4%;
+  }
+  50% {
+    top: 92%;
+  }
+}
+@keyframes sheet-scan-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+@layer utilities {
+  .animate-sheet-scan {
+    animation: sheet-scan 2.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-sheet-scan {
+      top: 48%;
+      animation: sheet-scan-pulse 2s ease-in-out infinite;
+    }
+  }
+}

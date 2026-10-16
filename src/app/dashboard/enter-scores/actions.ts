@@ -5,7 +5,7 @@ import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/database/db"
 import {
     matches,
@@ -15,7 +15,8 @@ import {
     teams,
     divisions,
     individual_divisions,
-    scoreSheets
+    scoreSheets,
+    users
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getSessionUserId, hasPermissionBySession } from "@/next/session"
@@ -30,6 +31,11 @@ import {
     labelConfirmedSamples
 } from "@/lib/scoresheets/read/samples"
 import { parseSourceToken } from "@/lib/playoff-sources"
+import { shortPersonName } from "@/lib/scores/entered-by"
+import {
+    isScoreEmpty,
+    validateMatchScores
+} from "@/lib/scores/match-validation"
 
 async function getEnterScoresSeasonId(): Promise<number | null> {
     const config = await getSeasonConfig()
@@ -57,6 +63,9 @@ export interface MatchScoreData {
     playoffMatchNum: number | null
     homeSource: string | null
     awaySource: string | null
+    /** Who last saved this match's scores, and when (ISO); null if unscored. */
+    scoresEnteredBy: string | null
+    scoresEnteredAt: string | null
 }
 
 export interface DivisionMatchGroup {
@@ -78,6 +87,9 @@ export interface ScoreSheetData {
     /** The court its tag named, for a sheet uploaded in bulk; null until read. */
     court: number | null
     imagePath: string
+    uploadedBy: string
+    /** ISO time of the upload. */
+    uploadedAt: string
 }
 
 export interface MatchesForDateData {
@@ -152,7 +164,9 @@ export const getMatchesForDate = withAction(
                     homeSet3Score: matches.home_set3_score,
                     awaySet3Score: matches.away_set3_score,
                     winner: matches.winner,
-                    playoff: matches.playoff
+                    playoff: matches.playoff,
+                    enteredById: matches.scores_entered_by,
+                    enteredAt: matches.scores_entered_at
                 })
                 .from(matches)
                 .where(
@@ -280,6 +294,30 @@ export const getMatchesForDate = withAction(
                 }
             }
 
+            // Get existing score sheets
+            const sheetRows = await db
+                .select({
+                    id: scoreSheets.id,
+                    divisionId: scoreSheets.division_id,
+                    court: scoreSheets.court,
+                    imagePath: scoreSheets.image_path,
+                    uploadedById: scoreSheets.uploaded_by,
+                    uploadedAt: scoreSheets.uploaded_at
+                })
+                .from(scoreSheets)
+                .where(
+                    and(
+                        eq(scoreSheets.season_id, seasonId),
+                        eq(scoreSheets.match_date, date)
+                    )
+                )
+                .orderBy(asc(scoreSheets.uploaded_at))
+
+            const personName = await loadPersonNames([
+                ...matchRows.map((r) => r.enteredById),
+                ...sheetRows.map((s) => s.uploadedById)
+            ])
+
             // Group matches by division
             const divisionMap = new Map<number, MatchScoreData[]>()
             for (const row of matchRows) {
@@ -307,7 +345,11 @@ export const getMatchesForDate = withAction(
                     playoff: row.playoff,
                     playoffMatchNum: meta?.matchNum ?? null,
                     homeSource: meta?.homeSource ?? null,
-                    awaySource: meta?.awaySource ?? null
+                    awaySource: meta?.awaySource ?? null,
+                    scoresEnteredBy: row.enteredById
+                        ? (personName.get(row.enteredById) ?? "Unknown")
+                        : null,
+                    scoresEnteredAt: row.enteredAt?.toISOString() ?? null
                 }
 
                 const list = divisionMap.get(row.division) ?? []
@@ -340,28 +382,13 @@ export const getMatchesForDate = withAction(
                     }
                 })
 
-            // Get existing score sheets
-            const sheetRows = await db
-                .select({
-                    id: scoreSheets.id,
-                    divisionId: scoreSheets.division_id,
-                    court: scoreSheets.court,
-                    imagePath: scoreSheets.image_path
-                })
-                .from(scoreSheets)
-                .where(
-                    and(
-                        eq(scoreSheets.season_id, seasonId),
-                        eq(scoreSheets.match_date, date)
-                    )
-                )
-                .orderBy(asc(scoreSheets.uploaded_at))
-
             const scoreSheetData: ScoreSheetData[] = sheetRows.map((s) => ({
                 id: s.id,
                 divisionId: s.divisionId,
                 court: s.court,
-                imagePath: s.imagePath
+                imagePath: s.imagePath,
+                uploadedBy: personName.get(s.uploadedById) ?? "Unknown",
+                uploadedAt: s.uploadedAt.toISOString()
             }))
 
             return ok({
@@ -436,7 +463,16 @@ export const saveScoresForDivision = withAction(
                 .select({
                     id: matches.id,
                     homeTeam: matches.home_team,
-                    awayTeam: matches.away_team
+                    awayTeam: matches.away_team,
+                    homeScore: matches.home_score,
+                    awayScore: matches.away_score,
+                    homeSet1Score: matches.home_set1_score,
+                    awaySet1Score: matches.away_set1_score,
+                    homeSet2Score: matches.home_set2_score,
+                    awaySet2Score: matches.away_set2_score,
+                    homeSet3Score: matches.home_set3_score,
+                    awaySet3Score: matches.away_set3_score,
+                    winner: matches.winner
                 })
                 .from(matches)
                 .where(
@@ -448,12 +484,7 @@ export const saveScoresForDivision = withAction(
                     )
                 )
 
-            const validMatchMap = new Map(
-                validMatches.map((m) => [
-                    m.id,
-                    { homeTeam: m.homeTeam, awayTeam: m.awayTeam }
-                ])
-            )
+            const validMatchMap = new Map(validMatches.map((m) => [m.id, m]))
             const invalidIds = matchIds.filter((id) => !validMatchMap.has(id))
             if (invalidIds.length > 0) {
                 return fail(`Invalid match IDs: ${invalidIds.join(", ")}`)
@@ -480,6 +511,13 @@ export const saveScoresForDivision = withAction(
                 }
             }
 
+            // Resolved before the write so each changed match records who
+            // entered it, which the score pages show per court.
+            const actorId = await getSessionUserId()
+            // The database's clock, like score_sheets.uploaded_at, so the two
+            // can be compared: a photo newer than a save is news about it.
+            const enteredAt = sql`now()`
+
             const autoPromotions: Array<{
                 matchId: number
                 previousPrimaryId: string
@@ -491,6 +529,16 @@ export const saveScoresForDivision = withAction(
             // primary ref's team becomes a participant.
             await db.transaction(async (tx) => {
                 for (const score of matchScores) {
+                    // A division is saved whole, so only a match whose result
+                    // actually changed is re-attributed to whoever saved it.
+                    const entered = isScoreEmpty(score, score.winner)
+                        ? { scores_entered_by: null, scores_entered_at: null }
+                        : scoreChanged(validMatchMap.get(score.matchId), score)
+                          ? {
+                                scores_entered_by: actorId,
+                                scores_entered_at: enteredAt
+                            }
+                          : {}
                     await tx
                         .update(matches)
                         .set({
@@ -502,9 +550,52 @@ export const saveScoresForDivision = withAction(
                             away_set2_score: score.awaySet2Score,
                             home_set3_score: score.homeSet3Score,
                             away_set3_score: score.awaySet3Score,
-                            winner: score.winner
+                            winner: score.winner,
+                            ...entered
                         })
                         .where(eq(matches.id, score.matchId))
+                }
+
+                // Re-validate once dependent teams have been resolved: a
+                // winner must be one of the two teams, and every result must
+                // agree with itself, as the score forms already insist.
+                const verifyResults = async () => {
+                    const finalRows = await tx
+                        .select({
+                            id: matches.id,
+                            homeTeam: matches.home_team,
+                            awayTeam: matches.away_team
+                        })
+                        .from(matches)
+                        .where(inArray(matches.id, matchIds))
+                    const finalById = new Map(finalRows.map((r) => [r.id, r]))
+                    for (const score of matchScores) {
+                        const m = finalById.get(score.matchId)
+                        if (!m) continue
+                        if (
+                            score.winner !== null &&
+                            score.winner !== m.homeTeam &&
+                            score.winner !== m.awayTeam
+                        ) {
+                            throw new Error(`INVALID_WINNER:${score.matchId}`)
+                        }
+                        const problems = validateMatchScores(
+                            score,
+                            score.winner,
+                            {
+                                homeTeamId: m.homeTeam,
+                                awayTeamId: m.awayTeam,
+                                homeTeamName: "The home team",
+                                awayTeamName: "The away team"
+                            }
+                        )
+                        if (problems.length > 0) {
+                            throw new InvalidScoresError(
+                                score.matchId,
+                                problems
+                            )
+                        }
+                    }
                 }
 
                 // Determine whether this save touched any playoff match in this
@@ -521,7 +612,10 @@ export const saveScoresForDivision = withAction(
                         )
                     )
 
-                if (playoffMetaForUpdated.length === 0) return
+                if (playoffMetaForUpdated.length === 0) {
+                    await verifyResults()
+                    return
+                }
 
                 // Pull EVERY meta row in this (season, division) — not just the
                 // weeks this save touched. Forward dependencies routinely cross
@@ -687,7 +781,9 @@ export const saveScoresForDivision = withAction(
                                     home_set2_score: null,
                                     away_set2_score: null,
                                     home_set3_score: null,
-                                    away_set3_score: null
+                                    away_set3_score: null,
+                                    scores_entered_by: null,
+                                    scores_entered_at: null
                                 })
                                 .where(eq(matches.id, m.matchId))
                         }
@@ -791,37 +887,7 @@ export const saveScoresForDivision = withAction(
                     if (!changed) break
                 }
 
-                // Re-validate winners now that dependent teams have been resolved.
-                // If a winner doesn't match either participating team, abort.
-                const winnersToCheck = matchScores.filter(
-                    (s) => s.winner !== null
-                )
-                if (winnersToCheck.length > 0) {
-                    const finalRows = await tx
-                        .select({
-                            id: matches.id,
-                            homeTeam: matches.home_team,
-                            awayTeam: matches.away_team
-                        })
-                        .from(matches)
-                        .where(
-                            inArray(
-                                matches.id,
-                                winnersToCheck.map((s) => s.matchId)
-                            )
-                        )
-                    const finalById = new Map(finalRows.map((r) => [r.id, r]))
-                    for (const score of winnersToCheck) {
-                        const m = finalById.get(score.matchId)
-                        if (!m) continue
-                        if (
-                            score.winner !== m.homeTeam &&
-                            score.winner !== m.awayTeam
-                        ) {
-                            throw new Error(`INVALID_WINNER:${score.matchId}`)
-                        }
-                    }
-                }
+                await verifyResults()
             })
 
             // Any cropped boxes kept from a photograph of these matches can now
@@ -835,7 +901,6 @@ export const saveScoresForDivision = withAction(
                 // Deliberately ignored; recorded inside labelConfirmedSamples.
             }
 
-            const actorId = await getSessionUserId()
             if (actorId) {
                 // Reads behind these matches leave the inbox's review queue.
                 await confirmReadsForMatches(savedMatchIds, actorId)
@@ -870,6 +935,11 @@ export const saveScoresForDivision = withAction(
                 `Saved scores for ${matchScores.length} match(es).`
             )
         } catch (error) {
+            if (error instanceof InvalidScoresError) {
+                return fail(
+                    `Match ${error.matchId}: ${error.problems.join("; ")}.`
+                )
+            }
             logger.error("Error saving scores", undefined, error)
             if (
                 error instanceof Error &&
@@ -884,6 +954,59 @@ export const saveScoresForDivision = withAction(
         }
     }
 )
+
+async function loadPersonNames(
+    ids: (string | null)[]
+): Promise<Map<string, string>> {
+    const unique = Array.from(
+        new Set(ids.filter((id): id is string => id !== null))
+    )
+    if (unique.length === 0) return new Map()
+    const rows = await db
+        .select({
+            id: users.id,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name
+        })
+        .from(users)
+        .where(inArray(users.id, unique))
+    return new Map(
+        rows.map((u) => [
+            u.id,
+            shortPersonName(u.firstName, u.lastName, u.preferredName)
+        ])
+    )
+}
+
+class InvalidScoresError extends Error {
+    constructor(
+        readonly matchId: number,
+        readonly problems: string[]
+    ) {
+        super(`INVALID_SCORES:${matchId}`)
+    }
+}
+
+type StoredScores = Omit<MatchScoreInput, "matchId">
+
+function scoreChanged(
+    before: StoredScores | undefined,
+    after: StoredScores
+): boolean {
+    if (!before) return true
+    return (
+        before.homeScore !== after.homeScore ||
+        before.awayScore !== after.awayScore ||
+        before.homeSet1Score !== after.homeSet1Score ||
+        before.awaySet1Score !== after.awaySet1Score ||
+        before.homeSet2Score !== after.homeSet2Score ||
+        before.awaySet2Score !== after.awaySet2Score ||
+        before.homeSet3Score !== after.homeSet3Score ||
+        before.awaySet3Score !== after.awaySet3Score ||
+        before.winner !== after.winner
+    )
+}
 
 const SCORE_SHEET_PREFIX = "scoresheets"
 const SHEET_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -1000,7 +1123,8 @@ export const finalizeScoreSheetUpload = withAction(
                     id: scoreSheets.id,
                     divisionId: scoreSheets.division_id,
                     court: scoreSheets.court,
-                    imagePath: scoreSheets.image_path
+                    imagePath: scoreSheets.image_path,
+                    uploadedAt: scoreSheets.uploaded_at
                 })
 
             await logAuditEntry({
@@ -1017,7 +1141,11 @@ export const finalizeScoreSheetUpload = withAction(
                     id: inserted.id,
                     divisionId: inserted.divisionId,
                     court: inserted.court,
-                    imagePath: inserted.imagePath
+                    imagePath: inserted.imagePath,
+                    uploadedBy:
+                        (await loadPersonNames([actorId])).get(actorId) ??
+                        "Unknown",
+                    uploadedAt: inserted.uploadedAt.toISOString()
                 },
                 "Score sheet uploaded."
             )

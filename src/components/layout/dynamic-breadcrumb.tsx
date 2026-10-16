@@ -29,7 +29,7 @@ function formatSegmentToTitle(segment: string): string {
         // Route kept as /captain-pairing after the page was renamed.
         "captain-pairing": "My Season Preferences",
         // The route says inbox; the page is called what admins call it.
-        "score-sheet-inbox": "Score Sheet Photos",
+        "upload-score-sheets": "Upload Score Sheets",
         api: "API",
         ui: "UI",
         ux: "UX",

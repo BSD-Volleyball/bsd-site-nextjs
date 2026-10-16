@@ -87,17 +87,15 @@ test.describe("score sheet photo capture", () => {
     test("offers a camera button alongside the desktop drop zone", async ({
         page
     }) => {
-        await page.goto("/dashboard/score-sheet-inbox")
+        await page.goto("/dashboard/upload-score-sheets")
         await expect(
-            page.getByRole("heading", { name: "Score Sheet Photos" })
+            page.getByRole("heading", { name: "Upload Score Sheets" })
         ).toBeVisible()
 
         await expect(
             page.getByRole("button", { name: "Take a photo" })
         ).toBeVisible()
-        await expect(
-            page.getByText("Or drop tonight's photos here")
-        ).toBeVisible()
+        await expect(page.getByText("Drop tonight's photos here")).toBeVisible()
 
         // The camera input must ask for the rear camera and take one photo:
         // `capture` is what opens the camera rather than a file browser, and
@@ -115,7 +113,7 @@ test.describe("score sheet photo capture", () => {
 
     test("works at phone width", async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 })
-        await page.goto("/dashboard/score-sheet-inbox")
+        await page.goto("/dashboard/upload-score-sheets")
 
         const button = page.getByRole("button", { name: "Take a photo" })
         await expect(button).toBeVisible()

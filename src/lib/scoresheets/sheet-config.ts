@@ -117,7 +117,8 @@ export function sheetCode(
 /**
  * Printed beside the QR code for anyone typing it by hand. The QR image
  * itself (`public/score-sheet-qr.png`) encodes this same short link, which
- * redirects to /dashboard/enter-scores. It is deliberately generic: one
+ * redirects (a Cloudflare redirect rule on the bsdvb.us zone) to
+ * /dashboard/upload-score-sheets. It is deliberately generic: one
  * person collects every court's sheet and works through them on one page.
  */
 export const SCORE_ENTRY_SHORT_URL = "bsdvb.us/s"

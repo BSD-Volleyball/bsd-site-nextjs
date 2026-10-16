@@ -44,8 +44,9 @@ import {
     type ValidationWarning,
     validateMatch
 } from "./match-validation"
-import { getSheetReads } from "../score-sheet-inbox/actions"
+import { getSheetReads } from "../upload-score-sheets/actions"
 import { PhotoDraftBanner } from "./photo-draft-banner"
+import { CourtEntrySummary } from "./court-entry-summary"
 import { ScoreSheetImageViewer } from "./score-sheet-image-viewer"
 
 interface EnterScoresClientProps {
@@ -352,6 +353,12 @@ export function EnterScoresClient({
                 toast.error(result.message)
             } else {
                 toast.success(result.message)
+                // Picks up who entered each match without touching the form
+                const reloaded = await getMatchesForDate(selectedDate)
+                if (reloaded.status) {
+                    setDivisionGroups(reloaded.data.divisions)
+                    setScoreSheetsList(reloaded.data.scoreSheets)
+                }
             }
         } catch {
             toast.error("Failed to save scores.")
@@ -508,6 +515,13 @@ export function EnterScoresClient({
                     applied={appliedDrafts.size > 0}
                     onApply={applyDrafts}
                     onDismiss={() => setDrafts({})}
+                />
+            )}
+
+            {!loadingDate && divisionGroups.length > 0 && (
+                <CourtEntrySummary
+                    divisions={divisionGroups}
+                    scoreSheets={scoreSheetsList}
                 />
             )}
 

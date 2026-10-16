@@ -171,6 +171,100 @@ describe("saveScoresForDivision", () => {
         expect(result.status).toBe(false)
         expect(result.message).toContain("Invalid winner")
     })
+
+    it("records who entered a result, and only re-attributes a change", async () => {
+        const first = await createUserWithRoles([{ role: "admin" }])
+        await saveScoresForDivision(fixture.divisionId, MATCH_DATE, [
+            scoreInput()
+        ])
+        const [afterFirst] = await db
+            .select()
+            .from(matches)
+            .where(eq(matches.id, fixture.matchId))
+        expect(afterFirst.scores_entered_by).toBe(first.id)
+        expect(afterFirst.scores_entered_at).toBeInstanceOf(Date)
+
+        // Re-saving the same result (as a whole-division save does) keeps it
+        await createUserWithRoles([{ role: "admin" }])
+        await saveScoresForDivision(fixture.divisionId, MATCH_DATE, [
+            scoreInput()
+        ])
+        const [unchanged] = await db
+            .select()
+            .from(matches)
+            .where(eq(matches.id, fixture.matchId))
+        expect(unchanged.scores_entered_by).toBe(first.id)
+
+        // A correction is attributed to whoever made it
+        const corrector = await createUserWithRoles([{ role: "admin" }])
+        await saveScoresForDivision(fixture.divisionId, MATCH_DATE, [
+            scoreInput({ homeSet3Score: 15, awaySet3Score: 12 })
+        ])
+        const [corrected] = await db
+            .select()
+            .from(matches)
+            .where(eq(matches.id, fixture.matchId))
+        expect(corrected.scores_entered_by).toBe(corrector.id)
+    })
+
+    it("clears who entered it when the result is cleared", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        await saveScoresForDivision(fixture.divisionId, MATCH_DATE, [
+            scoreInput()
+        ])
+        const cleared = await saveScoresForDivision(
+            fixture.divisionId,
+            MATCH_DATE,
+            [
+                scoreInput({
+                    homeScore: null,
+                    awayScore: null,
+                    homeSet1Score: null,
+                    awaySet1Score: null,
+                    homeSet2Score: null,
+                    awaySet2Score: null,
+                    homeSet3Score: null,
+                    awaySet3Score: null,
+                    winner: null
+                })
+            ]
+        )
+        expect(cleared.status).toBe(true)
+        const [saved] = await db
+            .select()
+            .from(matches)
+            .where(eq(matches.id, fixture.matchId))
+        expect(saved.winner).toBeNull()
+        expect(saved.scores_entered_by).toBeNull()
+        expect(saved.scores_entered_at).toBeNull()
+    })
+
+    it("rejects totals that disagree with the game scores", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await saveScoresForDivision(
+            fixture.divisionId,
+            MATCH_DATE,
+            [scoreInput({ homeScore: 3, awayScore: 0 })]
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toMatch(/Total Games Won is 3/)
+        const [saved] = await db
+            .select()
+            .from(matches)
+            .where(eq(matches.id, fixture.matchId))
+        expect(saved.home_score).toBeNull()
+    })
+
+    it("rejects a winner the game scores contradict", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await saveScoresForDivision(
+            fixture.divisionId,
+            MATCH_DATE,
+            [scoreInput({ winner: fixture.awayTeamId })]
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toMatch(/selected as winner/)
+    })
 })
 
 describe("finalizeScoreSheetUpload", () => {

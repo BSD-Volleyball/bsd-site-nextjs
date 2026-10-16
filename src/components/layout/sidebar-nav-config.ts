@@ -443,8 +443,8 @@ export const enterScoresNavItem: NavItem = {
 }
 
 export const scoreSheetInboxNavItem: NavItem = {
-    title: "Score Sheet Photos",
-    url: "/dashboard/score-sheet-inbox",
+    title: "Upload Score Sheets",
+    url: "/dashboard/upload-score-sheets",
     icon: RiClipboardLine
 }
 

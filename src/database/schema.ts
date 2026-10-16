@@ -560,7 +560,13 @@ export const matches = pgTable(
         winner: integer("winner").references(() => teams.id, {
             onDelete: "set null"
         }),
-        playoff: boolean("playoff").default(false).notNull()
+        playoff: boolean("playoff").default(false).notNull(),
+        // Who last saved this match's scores, and when; null while unscored
+        scores_entered_by: text("scores_entered_by").references(
+            () => users.id,
+            { onDelete: "set null" }
+        ),
+        scores_entered_at: timestamp("scores_entered_at")
     },
     (table) => ({
         matchesSeasonIdx: index("matches_season_idx").on(table.season),
