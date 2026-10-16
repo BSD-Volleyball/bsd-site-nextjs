@@ -1,10 +1,11 @@
 "use server"
 
 import { db } from "@/database/db"
-import { users, verifications } from "@/database/schema"
-import { and, eq, like, ne, sql } from "drizzle-orm"
+import { users } from "@/database/schema"
+import { and, eq, ne, sql } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
+import { markEmailChanged } from "@/lib/auth-verification"
 import { logger } from "@/lib/logger"
 import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
@@ -68,10 +69,6 @@ export const updateAccountProfile = withAction(
                     last_name: data.last_name || "",
                     preferred_name: data.preferred_name,
                     email,
-                    // A new address is unproven. Leaving it marked verified would
-                    // let someone claim another person's address and have that
-                    // person's Google sign-in link into this account.
-                    ...(emailChanged ? { emailVerified: false } : {}),
                     phone: data.phone,
                     emergency_contact: data.emergency_contact,
                     pronouns: data.pronouns,
@@ -80,21 +77,12 @@ export const updateAccountProfile = withAction(
                 })
                 .where(eq(users.id, session.user.id))
 
+            // A new address is unproven: it drops emailVerified and revokes
+            // reset tokens mailed to the old one. Whoever proves the new
+            // address (verification link or reset) becomes its sole holder;
+            // see src/lib/auth-verification.ts.
             if (emailChanged) {
-                // better-auth keys a reset token by user id, not by the
-                // address it was mailed to, and a completed reset marks the
-                // email verified (onPasswordReset in src/lib/auth.ts). A
-                // token requested for the old address must not survive the
-                // change, or its holder could verify an address they never
-                // received mail at.
-                await tx
-                    .delete(verifications)
-                    .where(
-                        and(
-                            like(verifications.identifier, "reset-password:%"),
-                            eq(verifications.value, session.user.id)
-                        )
-                    )
+                await markEmailChanged(tx, session.user.id)
             }
         })
 

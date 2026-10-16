@@ -55,6 +55,7 @@ import type { Week1Audience } from "@/lib/week1-priority"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { invalidateAllSessionsForUser } from "@/lib/rbac"
+import { markEmailChanged } from "@/lib/auth-verification"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES
@@ -310,13 +311,28 @@ export const updateUser = withAction(
 
         try {
             const [existingUser] = await db
-                .select({ id: users.id })
+                .select({ id: users.id, email: users.email })
                 .from(users)
                 .where(eq(users.id, originalId))
                 .limit(1)
 
             if (!existingUser) {
                 return fail("User not found.")
+            }
+
+            // An admin-typed address is as unproven as a self-typed one: a
+            // typo would otherwise leave a verified address that whoever
+            // owns it can sign straight into (Google links into verified
+            // rows). The change drops emailVerified whatever the form sent;
+            // an admin who really knows can re-tick it on a second save.
+            if (data.email !== undefined) {
+                data.email = data.email.trim().toLowerCase()
+            }
+            const isEmailChanging =
+                data.email !== undefined &&
+                data.email !== existingUser.email.toLowerCase()
+            if (isEmailChanging) {
+                data.emailVerified = false
             }
 
             if (isIdChanging) {
@@ -410,6 +426,12 @@ export const updateUser = withAction(
             // clean re-login so no stale tokens survive the switch.
             if (isIdChanging) {
                 await invalidateAllSessionsForUser(effectiveId)
+            }
+
+            // Reset tokens mailed to the old address must not be able to
+            // verify the new one (see src/lib/auth-verification.ts).
+            if (isEmailChanging) {
+                await markEmailChanged(db, effectiveId)
             }
 
             const actorId = await getSessionUserId()

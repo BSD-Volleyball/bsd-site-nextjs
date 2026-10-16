@@ -9,7 +9,11 @@ import { db } from "@/database/db"
 import * as schema from "@/database/schema"
 import { site } from "@/config/site"
 import { sendMail } from "@/lib/email/send"
-import { claimOnVerification, markEmailVerified } from "@/lib/auth-verification"
+import {
+    claimOnVerification,
+    detachUnprovenSocialLogins,
+    markEmailVerified
+} from "@/lib/auth-verification"
 
 // Read lazily (first account-email send), not at module load: this module
 // is imported by every session check, and a filesystem read at import time
@@ -173,7 +177,12 @@ export const auth = betterAuth({
         // /auth/error offers when Google sign-in meets an unverified account:
         // the reset replaces whatever password was set and ends every other
         // session, so nobody who registered this address first keeps a way in.
+        // A Google login linked while the address was unproven is such a way
+        // in (Settings lets an account re-point itself at a stranger's
+        // address), so it goes too. `user` is the row as loaded before the
+        // reset, so emailVerified is the pre-reset state.
         onPasswordReset: async ({ user }) => {
+            await detachUnprovenSocialLogins(user.id, user.emailVerified)
             await markEmailVerified(user.id, user.email)
         },
         sendResetPassword: async ({ user, url }) => {

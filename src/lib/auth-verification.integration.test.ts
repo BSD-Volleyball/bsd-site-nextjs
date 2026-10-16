@@ -1,11 +1,13 @@
-import { eq } from "drizzle-orm"
+import { eq, like } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { accounts, sessions, users } from "@/database/schema"
+import { accounts, sessions, users, verifications } from "@/database/schema"
 import { createUser } from "@/test/session"
 import {
     claimOnVerification,
+    detachUnprovenSocialLogins,
     evictPreVerificationCredentials,
+    markEmailChanged,
     markEmailVerified
 } from "./auth-verification"
 
@@ -48,7 +50,7 @@ describe("evictPreVerificationCredentials", () => {
 
         expect(result).toEqual({
             sessionsRevoked: true,
-            credentialRemoved: true
+            accountsRemoved: true
         })
         expect(
             await db.select().from(sessions).where(eq(sessions.userId, user.id))
@@ -58,7 +60,10 @@ describe("evictPreVerificationCredentials", () => {
         ).toHaveLength(0)
     })
 
-    it("keeps social accounts and reports when there was nothing to evict", async () => {
+    // A Google row signs its holder in by provider id whatever address the
+    // user row now carries, so after someone else proves the address it is
+    // as much a way in as the password was.
+    it("removes social logins too", async () => {
         const user = await createUser({ emailVerified: false })
         await seedGoogleAccount(user.id)
 
@@ -66,13 +71,20 @@ describe("evictPreVerificationCredentials", () => {
 
         expect(result).toEqual({
             sessionsRevoked: false,
-            credentialRemoved: false
+            accountsRemoved: true
         })
-        const remaining = await db
-            .select({ providerId: accounts.providerId })
-            .from(accounts)
-            .where(eq(accounts.userId, user.id))
-        expect(remaining).toEqual([{ providerId: "google" }])
+        expect(
+            await db.select().from(accounts).where(eq(accounts.userId, user.id))
+        ).toHaveLength(0)
+    })
+
+    it("reports when there was nothing to evict", async () => {
+        const user = await createUser({ emailVerified: false })
+
+        expect(await evictPreVerificationCredentials(user.id)).toEqual({
+            sessionsRevoked: false,
+            accountsRemoved: false
+        })
     })
 
     it("does not touch another user's sessions or accounts", async () => {
@@ -176,11 +188,91 @@ describe("claimOnVerification", () => {
         expect(await remaining(user.id)).toEqual({ sessions: 0, accounts: 0 })
     })
 
-    it("is a no-op for a Google-only user with no password", async () => {
+    // The Settings path of the pre-account hijack: sign up with Google, then
+    // re-point the address at a stranger's. When the stranger proves the
+    // address the Google login must go with the sessions.
+    it("evicts the Google login of a user who re-pointed their address", async () => {
         const user = await createUser({ emailVerified: false })
         await seedGoogleAccount(user.id)
+        await seedSession(user.id)
 
         await expect(claimOnVerification(user.id, null)).resolves.toBe(true)
-        expect(await remaining(user.id)).toEqual({ sessions: 0, accounts: 1 })
+        expect(await remaining(user.id)).toEqual({ sessions: 0, accounts: 0 })
+    })
+})
+
+// The reset path of the same hijack: the victim recovers through "forgot
+// password" (what /auth/error offers), so the reset must also drop a Google
+// login that was linked while the address was unproven.
+describe("detachUnprovenSocialLogins", () => {
+    it("removes social logins when the address was unverified", async () => {
+        const user = await createUser({ emailVerified: false })
+        await seedGoogleAccount(user.id)
+        await seedCredentialAccount(user.id)
+
+        expect(await detachUnprovenSocialLogins(user.id, false)).toBe(true)
+        const remaining = await db
+            .select({ providerId: accounts.providerId })
+            .from(accounts)
+            .where(eq(accounts.userId, user.id))
+        expect(remaining).toEqual([{ providerId: "credential" }])
+    })
+
+    it("keeps social logins linked while the address was verified", async () => {
+        const user = await createUser({ emailVerified: true })
+        await seedGoogleAccount(user.id)
+
+        expect(await detachUnprovenSocialLogins(user.id, true)).toBe(false)
+        expect(
+            await db.select().from(accounts).where(eq(accounts.userId, user.id))
+        ).toHaveLength(1)
+    })
+})
+
+describe("markEmailChanged", () => {
+    it("drops emailVerified and revokes the user's reset tokens only", async () => {
+        const user = await createUser({ emailVerified: true })
+        const other = await createUser()
+        await db.insert(verifications).values([
+            {
+                id: crypto.randomUUID(),
+                identifier: "reset-password:tok-mine",
+                value: user.id,
+                expiresAt: new Date(Date.now() + 60_000)
+            },
+            {
+                id: crypto.randomUUID(),
+                identifier: `${user.email}-change-email`,
+                value: user.id,
+                expiresAt: new Date(Date.now() + 60_000)
+            },
+            {
+                id: crypto.randomUUID(),
+                identifier: "reset-password:tok-other",
+                value: other.id,
+                expiresAt: new Date(Date.now() + 60_000)
+            }
+        ])
+
+        await markEmailChanged(db, user.id)
+
+        const [row] = await db
+            .select({ emailVerified: users.emailVerified })
+            .from(users)
+            .where(eq(users.id, user.id))
+        expect(row.emailVerified).toBe(false)
+        const left = await db
+            .select({ identifier: verifications.identifier })
+            .from(verifications)
+            .where(like(verifications.identifier, "%tok-%"))
+        expect(left.map((v) => v.identifier).sort()).toEqual([
+            "reset-password:tok-other"
+        ])
+        expect(
+            await db
+                .select()
+                .from(verifications)
+                .where(eq(verifications.value, user.id))
+        ).toHaveLength(1)
     })
 })
