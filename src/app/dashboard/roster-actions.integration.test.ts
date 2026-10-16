@@ -344,6 +344,19 @@ describe("renameTeam", () => {
         expect(revalidateTag).toHaveBeenCalled()
     })
 
+    it("allows one rename an hour, since each one mails the commissioners", async () => {
+        const { captain, team } = await seedRenameSeason()
+        loginAs(captain)
+
+        expect(await renameTeam(team.id, "First Try")).toMatchObject({
+            status: true
+        })
+        const again = await renameTeam(team.id, "Second Thoughts")
+        expect(again.status).toBe(false)
+        expect(again.message).toContain("last hour")
+        expect(await teamName(team.id)).toBe("First Try")
+    })
+
     it("lets the co-captain (captain2) rename", async () => {
         const { coCaptain, team } = await seedRenameSeason("draft")
         loginAs(coCaptain)

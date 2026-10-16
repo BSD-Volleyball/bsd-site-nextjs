@@ -173,6 +173,28 @@ describe("updateAccountProfile password-reset tokens", () => {
         expect(await resetTokensFor(bystander.id)).toHaveLength(1)
     })
 
+    it("allows one address change per cooldown, since each one sends mail", async () => {
+        const user = await createUser({ emailVerified: true })
+        loginAs(user)
+
+        const first = await updateAccountProfile(
+            profile({ email: "first@example.test" })
+        )
+        expect(first.status).toBe(true)
+        const second = await updateAccountProfile(
+            profile({ email: "second@example.test" })
+        )
+        expect(second.status).toBe(false)
+        expect(second.message).toContain("wait")
+        expect((await reload(user.id)).email).toBe("first@example.test")
+
+        // The rest of the profile still saves while the address is held
+        const name = await updateAccountProfile(
+            profile({ email: "first@example.test", first_name: "Renamed" })
+        )
+        expect(name.status).toBe(true)
+    })
+
     it("keeps reset tokens when the address is unchanged", async () => {
         const user = await createUser({ emailVerified: true })
         await seedResetToken(user.id)

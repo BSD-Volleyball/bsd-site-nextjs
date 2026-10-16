@@ -16,7 +16,7 @@ import { db } from "@/database/db"
 import { users, waitlist, teams, drafts, divisions } from "@/database/schema"
 import { eq, and, ne, or, sql } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import { logAuditEntry } from "@/lib/audit-log"
+import { countRecentAuditEntries, logAuditEntry } from "@/lib/audit-log"
 import { isTeamRenameOpen, normalizeTeamName } from "@/lib/team-name"
 import { notifyCommissionersOfTeamRename } from "@/lib/notifications/team-renamed"
 import { formatDisplayName } from "@/lib/utils"
@@ -162,6 +162,9 @@ export async function logContactDetailsViewed(): Promise<void> {
  * division's commissioners are emailed so an unsuitable name is seen, and
  * they can still change it on Select Captains.
  */
+/** The audit summary's fixed start; the rename throttle counts on it. */
+const RENAME_SUMMARY_PREFIX = "Renamed team"
+
 export const renameTeam = withAction(
     async (teamId: number, rawName: string): Promise<ActionResult> => {
         const session = await requireSession()
@@ -203,6 +206,21 @@ export const renameTeam = withAction(
         const newName = checked.name
         if (newName === team.name) return ok(undefined, "Team name unchanged.")
 
+        // Every rename mails the division's commissioners, and the mail is
+        // mandatory for them. One an hour is plenty for a change of mind.
+        const recentRenames = await countRecentAuditEntries({
+            action: "update",
+            entityType: "teams",
+            entityId: team.id,
+            summaryPrefix: RENAME_SUMMARY_PREFIX,
+            withinMinutes: 60
+        })
+        if (recentRenames > 0) {
+            return fail(
+                "This team was renamed in the last hour. Please wait before renaming it again."
+            )
+        }
+
         const [clash] = await db
             .select({ id: teams.id })
             .from(teams)
@@ -234,7 +252,7 @@ export const renameTeam = withAction(
             action: "update",
             entityType: "teams",
             entityId: team.id,
-            summary: `Renamed team "${team.name}" to "${newName}" (${team.divisionName}, season ${config.seasonId})`
+            summary: `${RENAME_SUMMARY_PREFIX} "${team.name}" to "${newName}" (${team.divisionName}, season ${config.seasonId})`
         })
 
         const [actor] = await db

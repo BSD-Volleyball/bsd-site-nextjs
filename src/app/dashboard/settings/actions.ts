@@ -3,12 +3,15 @@
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { and, eq, ne, sql } from "drizzle-orm"
-import { logAuditEntry } from "@/lib/audit-log"
+import { countRecentAuditEntries, logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
 import { markEmailChanged } from "@/lib/auth-verification"
 import { logger } from "@/lib/logger"
 import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
+
+const EMAIL_CHANGE_ACTION = "email_change"
+const EMAIL_CHANGE_COOLDOWN_MINUTES = 10
 
 export interface AccountProfileData {
     first_name: string | null
@@ -43,6 +46,19 @@ export const updateAccountProfile = withAction(
         const emailChanged = current?.email.toLowerCase() !== email
 
         if (emailChanged) {
+            // Each change mails a verification link to whatever address was
+            // typed, from the league's domain, with no CAPTCHA in the way.
+            const recent = await countRecentAuditEntries({
+                userId: session.user.id,
+                action: EMAIL_CHANGE_ACTION,
+                withinMinutes: EMAIL_CHANGE_COOLDOWN_MINUTES
+            })
+            if (recent > 0) {
+                return fail(
+                    `You changed your email address recently. Please wait ${EMAIL_CHANGE_COOLDOWN_MINUTES} minutes before changing it again.`
+                )
+            }
+
             const [taken] = await db
                 .select({ id: users.id })
                 .from(users)
@@ -107,6 +123,16 @@ export const updateAccountProfile = withAction(
             }
         }
 
+        if (emailChanged) {
+            // Its own entry: the throttle above counts these.
+            await logAuditEntry({
+                userId: session.user.id,
+                action: EMAIL_CHANGE_ACTION,
+                entityType: "users",
+                entityId: session.user.id,
+                summary: `Changed email address to ${email}`
+            })
+        }
         await logAuditEntry({
             userId: session.user.id,
             action: "update",
