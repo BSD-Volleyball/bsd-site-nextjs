@@ -74,13 +74,13 @@ export default function ConductCommitteeFAQPage() {
                         Is the report form really anonymous?
                     </h2>
                     <p>
-                        Yes. The form does not collect your email address, name,
-                        or any identifying information. Neither your Google
-                        account information nor your BSD account information is
-                        recorded when you submit a report. If you want
-                        follow-up, or would prefer an in-person or phone
-                        conversation, there is an optional contact field — but
-                        it is entirely up to you.
+                        Yes. The form is anonymous by default: with "Submit
+                        anonymously" ticked, neither your Google account
+                        information nor your BSD account information is recorded
+                        when you submit a report. If you want follow-up, or
+                        would prefer an in-person or phone conversation, untick
+                        it and fill in the optional contact fields — but that is
+                        entirely up to you.
                     </p>
                 </section>
 

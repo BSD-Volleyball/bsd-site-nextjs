@@ -20,7 +20,9 @@ export function ReportConcernForm() {
     const [submittedText, setSubmittedText] = useState("")
 
     // Form state
-    const [anonymous, setAnonymous] = useState(false)
+    // Anonymous by default: the public conduct FAQ promises the form records
+    // nothing about who sent it unless they choose to say.
+    const [anonymous, setAnonymous] = useState(true)
     const [wantFollowup, setWantFollowup] = useState(false)
     const [contactName, setContactName] = useState("")
     const [contactEmail, setContactEmail] = useState("")
