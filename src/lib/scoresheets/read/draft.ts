@@ -151,11 +151,3 @@ export function toScoreDraft(match: MatchRead): ScoreDraft {
 export function toScoreDrafts(read: SheetRead): ScoreDraft[] {
     return read.matches.map(toScoreDraft)
 }
-
-/** Fields worth drawing attention to, for a quick count in the UI. */
-export function flaggedFieldCount(drafts: readonly ScoreDraft[]): number {
-    return drafts.reduce(
-        (total, draft) => total + new Set(draft.flags.map((f) => f.field)).size,
-        0
-    )
-}

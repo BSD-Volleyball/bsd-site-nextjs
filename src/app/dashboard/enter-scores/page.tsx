@@ -1,14 +1,16 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { playerPicBaseUrl } from "@/config/env"
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/next/session"
-import { getSheetReads } from "../upload-score-sheets/actions"
 import { getMatchesForDate } from "./actions"
 import { getMatchDatesForSeason } from "./data"
 import { EnterScoresClient } from "./enter-scores-client"
-import type { ScoreDraft } from "@/lib/scoresheets/read/draft"
-import { toScoreDrafts } from "@/lib/scoresheets/read/draft"
+
+export const metadata: Metadata = {
+    title: "Edit Scores"
+}
 
 export default async function EnterScoresPage() {
     await requireSessionOrRedirect()
@@ -39,27 +41,15 @@ export default async function EnterScoresPage() {
     }
 
     // Pre-fetch matches for the default date
-    let initialData = null
-    // Whatever has already been read from photographs of this night, so the
-    // form can offer it without a round trip once the page is up.
-    const initialDrafts: Record<number, ScoreDraft> = {}
-    if (defaultDate) {
-        initialData = await getMatchesForDate(defaultDate)
-        const reads = await getSheetReads(defaultDate)
-        if (reads.status) {
-            for (const entry of reads.data) {
-                for (const draft of toScoreDrafts(entry.read)) {
-                    if (!draft.empty) initialDrafts[draft.matchId] = draft
-                }
-            }
-        }
-    }
+    const initialData = defaultDate
+        ? await getMatchesForDate(defaultDate)
+        : null
 
     const playerPicUrl = playerPicBaseUrl()
 
     return (
         <div className="space-y-6">
-            <h1 className="font-bold text-2xl">Enter Scores</h1>
+            <h1 className="font-bold text-2xl">Edit Scores</h1>
             <EnterScoresClient
                 matchDates={matchDates}
                 defaultDate={defaultDate}
@@ -70,7 +60,6 @@ export default async function EnterScoresPage() {
                     initialData?.status ? initialData.data.scoreSheets : []
                 }
                 picBaseUrl={playerPicUrl}
-                initialDrafts={initialDrafts}
             />
         </div>
     )

@@ -622,7 +622,7 @@ export const saveScoresForDivision = withAction(
                 // playoff weeks (e.g. week-2 slots are fed by week-1 W/L results),
                 // so scoping to the saved weeks would leave later rounds with NULL
                 // team slots and show them as permanently "locked / TBD" on the
-                // Enter Scores page. realizeOnce only fills slots that are still
+                // Edit Scores page. realizeOnce only fills slots that are still
                 // NULL, so widening the scope is safe and idempotent.
                 const allMeta = await tx
                     .select({

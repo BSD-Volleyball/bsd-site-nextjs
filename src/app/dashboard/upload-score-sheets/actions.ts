@@ -301,53 +301,6 @@ export const readUploadedSheet = withAction(
     }
 )
 
-/** The stored read, for pre-filling the score-entry form. */
-export const getSheetReads = withAction(
-    async (
-        date: string
-    ): Promise<
-        ActionResult<
-            { scoreSheetId: number; court: number | null; read: SheetRead }[]
-        >
-    > => {
-        const config = await requireSeasonConfig()
-        await requirePermission("scores:enter", {
-            seasonId: config.seasonId
-        })
-        const seasonId = config.seasonId
-        const day = requireDate(date)
-
-        const rows = await db
-            .select({
-                scoreSheetId: scoreSheets.id,
-                court: scoreSheets.court,
-                result: scoreSheetReads.result,
-                status: scoreSheetReads.status
-            })
-            .from(scoreSheets)
-            .innerJoin(
-                scoreSheetReads,
-                eq(scoreSheetReads.score_sheet_id, scoreSheets.id)
-            )
-            .where(
-                and(
-                    eq(scoreSheets.season_id, seasonId),
-                    eq(scoreSheets.match_date, day)
-                )
-            )
-
-        return ok(
-            rows
-                .filter((r) => r.result !== null)
-                .map((r) => ({
-                    scoreSheetId: r.scoreSheetId,
-                    court: r.court,
-                    read: r.result as SheetRead
-                }))
-        )
-    }
-)
-
 export const deleteUploadedSheet = withAction(
     async (scoreSheetId: number): Promise<ActionResult<void>> => {
         const config = await requireSeasonConfig()

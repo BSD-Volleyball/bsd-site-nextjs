@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { flaggedFieldCount, toScoreDraft } from "./draft"
+import { toScoreDraft } from "./draft"
 import type { MatchRead } from "./read"
 import type { GameVerdict } from "./combine"
 
@@ -111,13 +111,5 @@ describe("toScoreDraft", () => {
         expect(draft.fields.winnerSide).toBeNull()
         expect(draft.flags.map((f) => f.field)).toContain("homeScore")
         expect(draft.confidence).toBe(0)
-    })
-
-    it("counts each flagged field once however many notes it has", () => {
-        const draft = toScoreDraft(
-            match([won(25, 19, "low"), won(25, 21, "low"), game()])
-        )
-        // Four inputs flagged, not eight notes
-        expect(flaggedFieldCount([draft])).toBe(4)
     })
 })

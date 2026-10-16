@@ -117,7 +117,7 @@ export const TASK_GROUPS: TaskGroup[] = [
                 "Walk around the courts and pick up and dispose of any trash / recyclables."
             ),
             always(
-                "BRING THE SCORESHEETS WITH YOU. Enter the match results / scores on the BSD website (Court Mgmt → Enter Scores) or else email/text pics of the scoresheets to a director."
+                "BRING THE SCORESHEETS WITH YOU. Enter the match results / scores on the BSD website (Court Mgmt → Upload Score Sheets) or else email/text pics of the scoresheets to a director."
             )
         ]
     }

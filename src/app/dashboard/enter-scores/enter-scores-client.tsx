@@ -12,11 +12,6 @@ import {
 import { compressImageForUpload } from "@/lib/image-compression"
 import { SCORE_SHEET_COMPRESSION } from "@/lib/scoresheets/capture"
 import {
-    flaggedFieldCount,
-    type ScoreDraft,
-    toScoreDrafts
-} from "@/lib/scoresheets/read/draft"
-import {
     createScoreSheetUpload,
     deleteScoreSheet,
     type DivisionMatchGroup,
@@ -44,8 +39,6 @@ import {
     type ValidationWarning,
     validateMatch
 } from "./match-validation"
-import { getSheetReads } from "../upload-score-sheets/actions"
-import { PhotoDraftBanner } from "./photo-draft-banner"
 import { ScoreSheetImageViewer } from "./score-sheet-image-viewer"
 
 interface EnterScoresClientProps {
@@ -54,8 +47,6 @@ interface EnterScoresClientProps {
     initialDivisions: DivisionMatchGroup[]
     initialScoreSheets: ScoreSheetData[]
     picBaseUrl: string
-    /** Readings already taken from photographs of this night, keyed by match. */
-    initialDrafts: Record<number, ScoreDraft>
 }
 
 export function EnterScoresClient({
@@ -63,8 +54,7 @@ export function EnterScoresClient({
     defaultDate,
     initialDivisions,
     initialScoreSheets,
-    picBaseUrl,
-    initialDrafts
+    picBaseUrl
 }: EnterScoresClientProps) {
     const [selectedDate, setSelectedDate] = useState(defaultDate)
     const [divisionGroups, setDivisionGroups] =
@@ -89,10 +79,6 @@ export function EnterScoresClient({
         null
     )
     const [viewingImage, setViewingImage] = useState<string | null>(null)
-    /** Drafts read off photographs, keyed by match, until they are applied. */
-    const [drafts, setDrafts] =
-        useState<Record<number, ScoreDraft>>(initialDrafts)
-    const [appliedDrafts, setAppliedDrafts] = useState<Set<number>>(new Set())
 
     const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
     const uploadInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
@@ -171,64 +157,6 @@ export function EnterScoresClient({
 
     const maxSourceUploadBytes = 25 * 1024 * 1024
 
-    /**
-     * Pull whatever has been read from photographs for a night. Failing to
-     * find any is the normal case and never an error worth showing.
-     */
-    const loadDrafts = async (date: string) => {
-        setAppliedDrafts(new Set())
-        const result = await getSheetReads(date)
-        if (!result.status) {
-            setDrafts({})
-            return
-        }
-        const next: Record<number, ScoreDraft> = {}
-        for (const entry of result.data) {
-            for (const draft of toScoreDrafts(entry.read)) {
-                // A later photo of the same court supersedes an earlier one
-                if (!draft.empty) next[draft.matchId] = draft
-            }
-        }
-        setDrafts(next)
-    }
-
-    /**
-     * Copy a photo's reading into the form. The winner arrives as a side
-     * rather than a team id because a playoff block may have been printed as
-     * "Winner of M1"; the page has already resolved who that turned out to be.
-     */
-    const applyDrafts = () => {
-        setFormStates((current) => {
-            const next = { ...current }
-            for (const draft of Object.values(drafts)) {
-                const existing = next[draft.matchId]
-                if (!existing) continue
-                const resolved = resolvedByMatchId.get(draft.matchId)
-                const winner =
-                    draft.fields.winnerSide === "home"
-                        ? (resolved?.homeTeamId ?? null)
-                        : draft.fields.winnerSide === "away"
-                          ? (resolved?.awayTeamId ?? null)
-                          : null
-
-                next[draft.matchId] = {
-                    ...existing,
-                    homeScore: draft.fields.homeScore,
-                    awayScore: draft.fields.awayScore,
-                    homeSet1Score: draft.fields.homeSet1Score,
-                    awaySet1Score: draft.fields.awaySet1Score,
-                    homeSet2Score: draft.fields.homeSet2Score,
-                    awaySet2Score: draft.fields.awaySet2Score,
-                    homeSet3Score: draft.fields.homeSet3Score,
-                    awaySet3Score: draft.fields.awaySet3Score,
-                    winner: winner ?? existing.winner
-                }
-            }
-            return next
-        })
-        setAppliedDrafts(new Set(Object.keys(drafts).map(Number)))
-    }
-
     const handleDateChange = async (date: string) => {
         setSelectedDate(date)
         setLoadingDate(true)
@@ -248,7 +176,6 @@ export function EnterScoresClient({
                 }
             }
             setFormStates(newStates)
-            await loadDrafts(date)
         } catch {
             toast.error("Failed to load matches.")
         } finally {
@@ -506,16 +433,6 @@ export function EnterScoresClient({
                     </SelectContent>
                 </Select>
             </div>
-
-            {Object.keys(drafts).length > 0 && (
-                <PhotoDraftBanner
-                    drafts={Object.values(drafts)}
-                    flaggedCount={flaggedFieldCount(Object.values(drafts))}
-                    applied={appliedDrafts.size > 0}
-                    onApply={applyDrafts}
-                    onDismiss={() => setDrafts({})}
-                />
-            )}
 
             {loadingDate ? (
                 <div className="rounded-md bg-muted p-6 text-center text-muted-foreground">

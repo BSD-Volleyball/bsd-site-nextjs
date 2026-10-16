@@ -437,7 +437,7 @@ export const playoffsNavItem: NavItem = {
 }
 
 export const enterScoresNavItem: NavItem = {
-    title: "Enter Scores",
+    title: "Edit Scores",
     url: "/dashboard/enter-scores",
     icon: RiClipboardLine
 }

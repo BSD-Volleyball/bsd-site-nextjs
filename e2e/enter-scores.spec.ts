@@ -99,7 +99,7 @@ test.describe("enter scores", () => {
     }) => {
         await page.goto("/dashboard/enter-scores")
         await expect(
-            page.getByRole("heading", { name: "Enter Scores" })
+            page.getByRole("heading", { name: "Edit Scores" })
         ).toBeVisible()
 
         // Today's match is pre-selected (only date in the season)

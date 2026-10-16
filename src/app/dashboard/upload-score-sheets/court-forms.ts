@@ -6,7 +6,7 @@
  * validator would insist on anyway. The winner is a team id, and for a
  * playoff block printed as "Winner of M1" which team that is depends on the
  * winner of another match, so resolution runs to a fixed point the same way
- * Enter Scores does it live.
+ * Edit Scores does it live.
  */
 
 import type { ScoreDraft } from "@/lib/scoresheets/read/draft"
