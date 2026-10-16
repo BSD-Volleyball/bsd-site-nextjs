@@ -46,7 +46,6 @@ import {
 } from "./match-validation"
 import { getSheetReads } from "../upload-score-sheets/actions"
 import { PhotoDraftBanner } from "./photo-draft-banner"
-import { CourtEntrySummary } from "./court-entry-summary"
 import { ScoreSheetImageViewer } from "./score-sheet-image-viewer"
 
 interface EnterScoresClientProps {
@@ -515,13 +514,6 @@ export function EnterScoresClient({
                     applied={appliedDrafts.size > 0}
                     onApply={applyDrafts}
                     onDismiss={() => setDrafts({})}
-                />
-            )}
-
-            {!loadingDate && divisionGroups.length > 0 && (
-                <CourtEntrySummary
-                    divisions={divisionGroups}
-                    scoreSheets={scoreSheetsList}
                 />
             )}
 

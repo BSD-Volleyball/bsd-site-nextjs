@@ -342,12 +342,16 @@ test.describe("upload score sheets", () => {
             page.getByText("Every court is saved for this night.")
         ).toBeVisible()
 
-        // Enter Scores shows who saved each court
+        // Enter Scores shows who photographed each sheet and who saved each match
         await page.goto("/dashboard/enter-scores")
         await expect(
-            page.getByRole("heading", { name: "Courts" })
+            page.getByRole("heading", { name: "Enter Scores" })
         ).toBeVisible()
+        await expect(page.getByText("Photo by Ada Admin").first()).toBeVisible()
         await expect(page.getByText(/Saved by Ada Admin/).first()).toBeVisible()
-        await expect(page.getByText(/Photo by Ada Admin/).first()).toBeVisible()
+        await page.screenshot({
+            path: "test-results/enter-scores-attribution.png",
+            fullPage: true
+        })
     })
 })

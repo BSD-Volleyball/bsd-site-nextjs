@@ -1,5 +1,6 @@
 "use client"
 
+import { formatEnteredTime } from "@/lib/scores/entered-by"
 import type { RefObject } from "react"
 import { Button } from "@/components/ui/button"
 import type {
@@ -145,10 +146,13 @@ export function DivisionScoreCard({
                     {divSheets.length > 0 && (
                         <div className="flex flex-wrap gap-3">
                             {divSheets.map((sheet) => (
-                                <div key={sheet.id} className="group relative">
+                                <div
+                                    key={sheet.id}
+                                    className="group relative flex items-center gap-2"
+                                >
                                     <button
                                         type="button"
-                                        className="block overflow-hidden rounded-md border"
+                                        className="block shrink-0 overflow-hidden rounded-md border"
                                         onClick={() =>
                                             setViewingImage(
                                                 getImageUrl(sheet.imagePath)
@@ -162,9 +166,26 @@ export function DivisionScoreCard({
                                             className="h-20 w-20 object-cover"
                                         />
                                     </button>
+                                    <div className="text-muted-foreground text-xs leading-tight">
+                                        {sheet.court !== null && (
+                                            <p className="font-medium text-foreground">
+                                                Court {sheet.court}
+                                            </p>
+                                        )}
+                                        <p>Photo by {sheet.uploadedBy}</p>
+                                        {formatEnteredTime(
+                                            sheet.uploadedAt
+                                        ) && (
+                                            <p>
+                                                {formatEnteredTime(
+                                                    sheet.uploadedAt
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
                                     <button
                                         type="button"
-                                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                                        className="absolute -top-2 left-[4.25rem] flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100"
                                         onClick={() =>
                                             void handleDeleteScoreSheet(
                                                 sheet.id
