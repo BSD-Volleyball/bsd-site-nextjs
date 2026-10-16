@@ -29,6 +29,7 @@ import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { withTransientRetry } from "@/lib/db-retry"
+import { withSerializedPayment } from "@/lib/payment-lock"
 import {
     calculateDiscountedAmount,
     getActiveDiscountForUser,
@@ -66,6 +67,16 @@ async function validateRosterAgainstDivision(
     if (!division)
         return { ok: false, message: "Preferred division not found." }
 
+    // The caps bound the roster, so a list longer than both together is
+    // wrong before any of it is looked up.
+    const maxRoster = division.male_per_team + division.non_male_per_team
+    if (rosterUserIds.length + 1 > maxRoster) {
+        return {
+            ok: false,
+            message: `Roster has ${rosterUserIds.length + 1} players; ${division.name} teams have at most ${maxRoster}.`
+        }
+    }
+
     const allIds = [...new Set([captainUserId, ...rosterUserIds])]
     if (new Set(allIds).size !== 1 + rosterUserIds.length) {
         return { ok: false, message: "Duplicate players in roster." }
@@ -96,6 +107,20 @@ async function validateRosterAgainstDivision(
         .select({ id: users.id, male: users.male })
         .from(users)
         .where(inArray(users.id, allIds))
+    if (userRows.length !== allIds.length) {
+        return {
+            ok: false,
+            message: "One or more selected players could not be found."
+        }
+    }
+    // A player with no recorded gender would count against neither cap.
+    if (userRows.some((u) => u.male === null)) {
+        return {
+            ok: false,
+            message:
+                "One or more selected players have not completed their profile, so the roster caps cannot be checked."
+        }
+    }
     const males = userRows.filter((u) => u.male === true).length
     const nonMales = userRows.filter((u) => u.male === false).length
     if (males > division.male_per_team) {
@@ -146,187 +171,214 @@ export const submitTournamentSignup = withAction(
             return fail("Preferred division is required.")
         }
 
-        if (await isUserOnTournamentRoster(config.tournamentId, userId)) {
-            return fail("You are already on a team in this tournament.")
-        }
-
-        const validation = await validateRosterAgainstDivision(
-            config.tournamentId,
-            userId,
-            formData.preferredDivisionId,
-            formData.rosterUserIds
-        )
-        if (!validation.ok) return fail(validation.message)
-
-        // Final capacity check right before payment — guards against the race
-        // where another captain claims the last spot while this user has the
-        // signup page loaded. Mirrors validateFinalSignupAvailability on the
-        // season side.
-        const availability = await getTournamentAvailability(config)
-        const target = availability.divisions.find(
-            (d) => d.divisionId === formData.preferredDivisionId
-        )
-        if (!target) {
-            return fail("Preferred division not found.")
-        }
-        if (target.full) {
-            return fail(
-                `${target.divisionName} just filled up. Please reload and pick a different division.`
-            )
-        }
-        if (availability.allDivisionsFull) {
-            return fail(
-                "All divisions are now full. Please join the waitlist instead."
-            )
-        }
-
-        const originalAmount = getCurrentTournamentCost(config)
-        if (BigInt(Math.round(parseFloat(originalAmount) * 100)) <= BigInt(0)) {
-            return fail("Tournament cost is not configured.")
-        }
-
-        let finalAmount = originalAmount
-        let discountInfo:
-            | { id: number; percentage: string; originalAmount: string }
-            | undefined
-        if (discountId !== undefined) {
-            const discount = await getActiveDiscountForUser(
-                userId,
-                "tournament"
-            )
-            if (discount && discount.id === discountId) {
-                finalAmount = calculateDiscountedAmount(
-                    originalAmount,
-                    discount.percentage
-                )
-                discountInfo = {
-                    id: discount.id,
-                    percentage: discount.percentage,
-                    originalAmount
+        // Tournament signups are few and the capacity check below counts
+        // teams, so they run one at a time per tournament: two captains
+        // cannot both take the last spot in a division, and one captain
+        // cannot register twice from two tabs.
+        return await withSerializedPayment(
+            `tournament-signup:${config.tournamentId}`,
+            async () => {
+                if (
+                    await isUserOnTournamentRoster(config.tournamentId, userId)
+                ) {
+                    return fail("You are already on a team in this tournament.")
                 }
-            }
-        }
 
-        const amountCents = BigInt(Math.round(parseFloat(finalAmount) * 100))
-        const isFree = amountCents <= BigInt(0)
-
-        let paymentId: string | undefined
-        let receiptUrl: string | undefined
-
-        if (!isFree) {
-            if (!sourceId) {
-                return fail("Payment information is required.")
-            }
-            try {
-                const client = getSquareClient()
-                const response = await client.payments.create({
-                    idempotencyKey: chargeIdempotencyKey(
-                        "tournament",
-                        userId,
-                        config.tournamentId,
-                        sourceId,
-                        amountCents
-                    ),
-                    sourceId,
-                    amountMoney: { currency: "USD", amount: amountCents },
-                    buyerEmailAddress: session.user.email,
-                    note: `Volleyball Tournament ${config.name} (${config.year})`
-                })
-                if (!response.payment) return fail("Payment processing failed.")
-                paymentId = response.payment.id ?? undefined
-                receiptUrl = response.payment.receiptUrl ?? undefined
-            } catch (error) {
-                logger.error(
-                    "Tournament signup payment error",
-                    undefined,
-                    error
-                )
-                return fail("Payment failed. Please try again.")
-            }
-        }
-
-        const rosterIds = [userId, ...formData.rosterUserIds]
-        // A charged card must never leave half a registration, so every
-        // write after the payment happens in one transaction, retried on
-        // transient failures like the season flow.
-        try {
-            await withTransientRetry(() =>
-                db.transaction(async (tx) => {
-                    await recordWaiverAcceptance(
-                        userId,
-                        activeWaiver.id,
-                        undefined,
-                        tx
-                    )
-
-                    const [team] = await tx
-                        .insert(tournamentTeams)
-                        .values({
-                            tournament_id: config.tournamentId,
-                            preferred_division_id: formData.preferredDivisionId,
-                            captain_user_id: userId,
-                            name: formData.teamName.trim(),
-                            order_id: paymentId ?? null,
-                            amount_paid: finalAmount
-                        })
-                        .returning({ id: tournamentTeams.id })
-
-                    await tx.insert(tournamentRoster).values(
-                        rosterIds.map((rid) => ({
-                            tournament_id: config.tournamentId,
-                            team_id: team.id,
-                            user_id: rid,
-                            added_by_user_id: userId
-                        }))
-                    )
-
-                    // Mark any waitlist row for rostered users as placed on
-                    // this team — we keep the row (it's the historical
-                    // record of the player's pre-acceptance of the waiver)
-                    // rather than delete it.
-                    await tx
-                        .update(tournamentWaitlist)
-                        .set({ placed_team_id: team.id, approved: true })
-                        .where(
-                            and(
-                                eq(
-                                    tournamentWaitlist.tournament_id,
-                                    config.tournamentId
-                                ),
-                                inArray(tournamentWaitlist.user_id, rosterIds)
-                            )
-                        )
-
-                    if (discountInfo) {
-                        await markDiscountAsUsed(discountInfo.id, tx)
-                    }
-                })
-            )
-        } catch (dbError) {
-            if (!paymentId) throw dbError
-            logger.error(
-                "CRITICAL: Square tournament payment succeeded but the team registration failed — manual reconciliation required.",
-                {
-                    paymentId,
+                const validation = await validateRosterAgainstDivision(
+                    config.tournamentId,
                     userId,
-                    tournamentId: config.tournamentId,
-                    amount: finalAmount
-                },
-                dbError
-            )
-            return fail(
-                "Your payment went through, but we hit a problem finishing your registration. Please contact us and do NOT pay again — we'll complete your signup manually."
-            )
-        }
+                    formData.preferredDivisionId,
+                    formData.rosterUserIds
+                )
+                if (!validation.ok) return fail(validation.message)
 
-        await logAuditEntry({
-            userId,
-            action: "create_tournament_signup",
-            entityType: "tournament",
-            entityId: config.tournamentId,
-            summary: `Captain signed up team "${formData.teamName.trim()}" for ${config.name} ($${finalAmount}, ${rosterIds.length} players)${discountInfo ? ` (${discountInfo.percentage}% discount applied)` : ""}`
-        })
+                // Final capacity check right before payment — guards against the race
+                // where another captain claims the last spot while this user has the
+                // signup page loaded. Mirrors validateFinalSignupAvailability on the
+                // season side.
+                const availability = await getTournamentAvailability(config)
+                const target = availability.divisions.find(
+                    (d) => d.divisionId === formData.preferredDivisionId
+                )
+                if (!target) {
+                    return fail("Preferred division not found.")
+                }
+                if (target.full) {
+                    return fail(
+                        `${target.divisionName} just filled up. Please reload and pick a different division.`
+                    )
+                }
+                if (availability.allDivisionsFull) {
+                    return fail(
+                        "All divisions are now full. Please join the waitlist instead."
+                    )
+                }
 
-        return ok({ paymentId, receiptUrl })
+                const originalAmount = getCurrentTournamentCost(config)
+                if (
+                    BigInt(Math.round(parseFloat(originalAmount) * 100)) <=
+                    BigInt(0)
+                ) {
+                    return fail("Tournament cost is not configured.")
+                }
+
+                let finalAmount = originalAmount
+                let discountInfo:
+                    | { id: number; percentage: string; originalAmount: string }
+                    | undefined
+                if (discountId !== undefined) {
+                    const discount = await getActiveDiscountForUser(
+                        userId,
+                        "tournament"
+                    )
+                    if (discount && discount.id === discountId) {
+                        finalAmount = calculateDiscountedAmount(
+                            originalAmount,
+                            discount.percentage
+                        )
+                        discountInfo = {
+                            id: discount.id,
+                            percentage: discount.percentage,
+                            originalAmount
+                        }
+                    }
+                }
+
+                const amountCents = BigInt(
+                    Math.round(parseFloat(finalAmount) * 100)
+                )
+                const isFree = amountCents <= BigInt(0)
+
+                let paymentId: string | undefined
+                let receiptUrl: string | undefined
+
+                if (!isFree) {
+                    if (!sourceId) {
+                        return fail("Payment information is required.")
+                    }
+                    try {
+                        const client = getSquareClient()
+                        const response = await client.payments.create({
+                            idempotencyKey: chargeIdempotencyKey(
+                                "tournament",
+                                userId,
+                                config.tournamentId,
+                                sourceId,
+                                amountCents
+                            ),
+                            sourceId,
+                            amountMoney: {
+                                currency: "USD",
+                                amount: amountCents
+                            },
+                            buyerEmailAddress: session.user.email,
+                            note: `Volleyball Tournament ${config.name} (${config.year})`
+                        })
+                        if (!response.payment)
+                            return fail("Payment processing failed.")
+                        paymentId = response.payment.id ?? undefined
+                        receiptUrl = response.payment.receiptUrl ?? undefined
+                    } catch (error) {
+                        logger.error(
+                            "Tournament signup payment error",
+                            undefined,
+                            error
+                        )
+                        return fail("Payment failed. Please try again.")
+                    }
+                }
+
+                const rosterIds = [userId, ...formData.rosterUserIds]
+                // A charged card must never leave half a registration, so every
+                // write after the payment happens in one transaction, retried on
+                // transient failures like the season flow.
+                try {
+                    await withTransientRetry(() =>
+                        db.transaction(async (tx) => {
+                            await recordWaiverAcceptance(
+                                userId,
+                                activeWaiver.id,
+                                undefined,
+                                tx
+                            )
+
+                            const [team] = await tx
+                                .insert(tournamentTeams)
+                                .values({
+                                    tournament_id: config.tournamentId,
+                                    preferred_division_id:
+                                        formData.preferredDivisionId,
+                                    captain_user_id: userId,
+                                    name: formData.teamName.trim(),
+                                    order_id: paymentId ?? null,
+                                    amount_paid: finalAmount
+                                })
+                                .returning({ id: tournamentTeams.id })
+
+                            await tx.insert(tournamentRoster).values(
+                                rosterIds.map((rid) => ({
+                                    tournament_id: config.tournamentId,
+                                    team_id: team.id,
+                                    user_id: rid,
+                                    added_by_user_id: userId
+                                }))
+                            )
+
+                            // Mark any waitlist row for rostered users as placed on
+                            // this team — we keep the row (it's the historical
+                            // record of the player's pre-acceptance of the waiver)
+                            // rather than delete it.
+                            await tx
+                                .update(tournamentWaitlist)
+                                .set({
+                                    placed_team_id: team.id,
+                                    approved: true
+                                })
+                                .where(
+                                    and(
+                                        eq(
+                                            tournamentWaitlist.tournament_id,
+                                            config.tournamentId
+                                        ),
+                                        inArray(
+                                            tournamentWaitlist.user_id,
+                                            rosterIds
+                                        )
+                                    )
+                                )
+
+                            if (discountInfo) {
+                                await markDiscountAsUsed(discountInfo.id, tx)
+                            }
+                        })
+                    )
+                } catch (dbError) {
+                    if (!paymentId) throw dbError
+                    logger.error(
+                        "CRITICAL: Square tournament payment succeeded but the team registration failed — manual reconciliation required.",
+                        {
+                            paymentId,
+                            userId,
+                            tournamentId: config.tournamentId,
+                            amount: finalAmount
+                        },
+                        dbError
+                    )
+                    return fail(
+                        "Your payment went through, but we hit a problem finishing your registration. Please contact us and do NOT pay again — we'll complete your signup manually."
+                    )
+                }
+
+                await logAuditEntry({
+                    userId,
+                    action: "create_tournament_signup",
+                    entityType: "tournament",
+                    entityId: config.tournamentId,
+                    summary: `Captain signed up team "${formData.teamName.trim()}" for ${config.name} ($${finalAmount}, ${rosterIds.length} players)${discountInfo ? ` (${discountInfo.percentage}% discount applied)` : ""}`
+                })
+
+                return ok({ paymentId, receiptUrl })
+            }
+        )
     }
 )

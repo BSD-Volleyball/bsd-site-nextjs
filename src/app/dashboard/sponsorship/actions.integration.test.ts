@@ -121,6 +121,28 @@ describe("submitSponsorshipPayment", () => {
         ).toBe(true)
     })
 
+    // Two tabs, one card: the second request must wait for the first to
+    // record and then see "already paid", not charge again.
+    it("charges once when the same payment is submitted twice at once", async () => {
+        const { contact, sponsorship } = await seedPendingSponsorship()
+        loginAs(contact)
+
+        const results = await Promise.all([
+            submitSponsorshipPayment("tok"),
+            submitSponsorshipPayment("tok")
+        ])
+
+        expect(paymentsCreate).toHaveBeenCalledTimes(1)
+        expect(results.filter((r) => r.status)).toHaveLength(1)
+        const refused = results.find((r) => !r.status)
+        expect(refused?.message).toContain("already paid")
+        const [row] = await db
+            .select()
+            .from(sponsorships)
+            .where(eq(sponsorships.id, sponsorship.id))
+        expect(row.status).toBe("paid")
+    })
+
     it("refuses to charge an already-paid sponsorship", async () => {
         const { contact, sponsorship } = await seedPendingSponsorship()
         await db

@@ -24,6 +24,7 @@ async function seedTournament(
     divisionOverrides: {
         male_per_team?: number
         non_male_per_team?: number
+        team_count?: number
     } = {}
 ) {
     const tournament = await createTournament()
@@ -129,6 +130,125 @@ describe("submitTournamentSignup", () => {
         if (!result.status) {
             expect(result.message).toContain("exceeds male cap (2 / 1)")
         }
+    })
+
+    it("rejects a roster longer than the division allows before looking anyone up", async () => {
+        const { tournamentDivision, waiver } = await seedTournament({
+            male_per_team: 1,
+            non_male_per_team: 1
+        })
+        const captain = await createUser({ male: true })
+        loginAs(captain)
+
+        const result = await submitTournamentSignup(
+            null,
+            form(tournamentDivision.id, ["ghost-1", "ghost-2"]),
+            waiver.id
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("at most 2")
+    })
+
+    it("rejects a roster with a player of unknown gender, who would escape both caps", async () => {
+        const { tournamentDivision, waiver } = await seedTournament()
+        const captain = await createUser({ male: true })
+        const unknown = await createUser({ male: null })
+        loginAs(captain)
+
+        const result = await submitTournamentSignup(
+            null,
+            form(tournamentDivision.id, [unknown.id]),
+            waiver.id
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("not completed their profile")
+    })
+
+    it("rejects a roster naming an id that is not a user", async () => {
+        const { tournamentDivision, waiver } = await seedTournament()
+        const captain = await createUser({ male: true })
+        loginAs(captain)
+
+        const result = await submitTournamentSignup(
+            null,
+            form(tournamentDivision.id, [crypto.randomUUID()]),
+            waiver.id
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("could not be found")
+    })
+
+    it("refuses the last spot to a second team once a division is full", async () => {
+        const { tournamentDivision, waiver } = await seedTournament({
+            team_count: 1
+        })
+        const first = await createUser({ male: true })
+        const second = await createUser({ male: true })
+        const d1 = await createDiscount({
+            user: first.id,
+            percentage: "100",
+            scope: "tournament"
+        })
+        const d2 = await createDiscount({
+            user: second.id,
+            percentage: "100",
+            scope: "tournament"
+        })
+
+        loginAs(first)
+        expect(
+            await submitTournamentSignup(
+                null,
+                form(tournamentDivision.id, []),
+                waiver.id,
+                d1.id
+            )
+        ).toMatchObject({ status: true })
+
+        loginAs(second)
+        const result = await submitTournamentSignup(
+            null,
+            form(tournamentDivision.id, []),
+            waiver.id,
+            d2.id
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("filled up")
+    })
+
+    it("registers one team when the same captain submits twice at once", async () => {
+        const { tournament, tournamentDivision, waiver } =
+            await seedTournament()
+        const captain = await createUser({ male: true })
+        const discount = await createDiscount({
+            user: captain.id,
+            percentage: "100",
+            scope: "tournament"
+        })
+        loginAs(captain)
+
+        const results = await Promise.all([
+            submitTournamentSignup(
+                null,
+                form(tournamentDivision.id, []),
+                waiver.id,
+                discount.id
+            ),
+            submitTournamentSignup(
+                null,
+                form(tournamentDivision.id, []),
+                waiver.id,
+                discount.id
+            )
+        ])
+
+        expect(results.filter((r) => r.status)).toHaveLength(1)
+        expect(
+            await db
+                .select()
+                .from(tournamentTeams)
+                .where(eq(tournamentTeams.tournament_id, tournament.id))
+        ).toHaveLength(1)
     })
 
     it("registers a team, roster and waiver acceptance (100% discount, no payment)", async () => {

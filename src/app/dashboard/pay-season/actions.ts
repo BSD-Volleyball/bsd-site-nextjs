@@ -34,6 +34,7 @@ import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logger } from "@/lib/logger"
 import { chargeIdempotencyKey, getSquareClient } from "@/lib/square"
 import { withTransientRetry } from "@/lib/db-retry"
+import { withSerializedPayment } from "@/lib/payment-lock"
 import { AGE_GROUPS, PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 
 export interface SignupFormData {
@@ -259,268 +260,281 @@ export async function submitSeasonPayment(
     }
 
     try {
-        const originalAmount = getCurrentSeasonAmount(config)
-        let finalAmount = originalAmount
-        let discountInfo:
-            | { originalAmount: string; percentage: string }
-            | undefined
+        // One payment at a time per player: two tabs cannot both pass the
+        // "not yet registered" check and both charge the card.
+        return await withSerializedPayment(
+            `season-signup:${sessionUser.id}:${seasonId}`,
+            async () => {
+                const originalAmount = getCurrentSeasonAmount(config)
+                let finalAmount = originalAmount
+                let discountInfo:
+                    | { originalAmount: string; percentage: string }
+                    | undefined
 
-        // Apply discount if provided and valid
-        if (discountId) {
-            const discount = await getActiveDiscountForUser(
-                sessionUser.id,
-                "season"
-            )
-            if (discount && discount.id === discountId) {
-                finalAmount = calculateDiscountedAmount(
-                    originalAmount,
-                    discount.percentage
-                )
-                discountInfo = {
-                    originalAmount,
-                    percentage: discount.percentage
-                }
-            }
-        }
-
-        const amountCents = BigInt(Math.round(parseFloat(finalAmount) * 100))
-
-        const availabilityCheck = await validateFinalSignupAvailability(
-            sessionUser.id,
-            { ...config, seasonId }
-        )
-
-        if (!availabilityCheck.ok) {
-            return {
-                status: false,
-                message:
-                    availabilityCheck.message ||
-                    "Signups are currently unavailable.",
-                shouldRefresh: availabilityCheck.shouldRefresh
-            }
-        }
-
-        const client = getSquareClient()
-        const response = await client.payments.create({
-            idempotencyKey: chargeIdempotencyKey(
-                "season",
-                sessionUser.id,
-                seasonId,
-                sourceId,
-                amountCents
-            ),
-            sourceId,
-            amountMoney: {
-                currency: "USD",
-                amount: amountCents
-            },
-            buyerEmailAddress: sessionUser.email,
-            note: `Volleyball ${config.seasonName} ${config.seasonYear} Season Payment - ${sessionUser.name || sessionUser.email}`
-        })
-
-        if (response.payment) {
-            const payment = response.payment
-            // The card is already charged (unrecoverable from here), so
-            // every follow-up write happens in one transaction: a player
-            // must never end up charged with half a registration. The
-            // whole transaction retries on transient failures (deadlock,
-            // dropped pooler connection) — safe because a failed attempt
-            // rolls back completely and signups (season, player) is
-            // unique, so even a lost-commit-ack edge cannot double-insert.
-            try {
-                await withTransientRetry(() =>
-                    db.transaction(async (tx) => {
-                        await recordWaiverAcceptance(
-                            sessionUser.id,
-                            activeWaiver.id,
-                            undefined,
-                            tx
+                // Apply discount if provided and valid
+                if (discountId) {
+                    const discount = await getActiveDiscountForUser(
+                        sessionUser.id,
+                        "season"
+                    )
+                    if (discount && discount.id === discountId) {
+                        finalAmount = calculateDiscountedAmount(
+                            originalAmount,
+                            discount.percentage
                         )
-
-                        const [newSignup] = await tx
-                            .insert(signups)
-                            .values({
-                                season: seasonId,
-                                player: sessionUser.id,
-                                order_id: payment.id,
-                                amount_paid: finalAmount,
-                                age: formData.age,
-                                captain: formData.captain,
-                                pair: formData.pair,
-                                pair_pick: formData.pairPick,
-                                pair_reason: formData.pairReason,
-                                ref_interest: formData.refInterest === true,
-                                tryout_help: formData.tryoutHelp === true,
-                                created_at: new Date()
-                            })
-                            .returning({ id: signups.id })
-
-                        if (
-                            formData.unavailableEventIds.length > 0 &&
-                            newSignup
-                        ) {
-                            await tx.insert(userUnavailability).values(
-                                formData.unavailableEventIds.map((eventId) => ({
-                                    user_id: sessionUser.id,
-                                    signup_id: newSignup.id,
-                                    event_id: eventId
-                                }))
-                            )
+                        discountInfo = {
+                            originalAmount,
+                            percentage: discount.percentage
                         }
+                    }
+                }
 
-                        await logAvailabilityChange(
-                            {
-                                userId: sessionUser.id,
-                                entityId: newSignup.id,
-                                events: await selectEventDates(
-                                    formData.unavailableEventIds,
+                const amountCents = BigInt(
+                    Math.round(parseFloat(finalAmount) * 100)
+                )
+
+                const availabilityCheck = await validateFinalSignupAvailability(
+                    sessionUser.id,
+                    { ...config, seasonId }
+                )
+
+                if (!availabilityCheck.ok) {
+                    return {
+                        status: false,
+                        message:
+                            availabilityCheck.message ||
+                            "Signups are currently unavailable.",
+                        shouldRefresh: availabilityCheck.shouldRefresh
+                    }
+                }
+
+                const client = getSquareClient()
+                const response = await client.payments.create({
+                    idempotencyKey: chargeIdempotencyKey(
+                        "season",
+                        sessionUser.id,
+                        seasonId,
+                        sourceId,
+                        amountCents
+                    ),
+                    sourceId,
+                    amountMoney: {
+                        currency: "USD",
+                        amount: amountCents
+                    },
+                    buyerEmailAddress: sessionUser.email,
+                    note: `Volleyball ${config.seasonName} ${config.seasonYear} Season Payment - ${sessionUser.name || sessionUser.email}`
+                })
+
+                if (response.payment) {
+                    const payment = response.payment
+                    // The card is already charged (unrecoverable from here), so
+                    // every follow-up write happens in one transaction: a player
+                    // must never end up charged with half a registration. The
+                    // whole transaction retries on transient failures (deadlock,
+                    // dropped pooler connection) — safe because a failed attempt
+                    // rolls back completely and signups (season, player) is
+                    // unique, so even a lost-commit-ack edge cannot double-insert.
+                    try {
+                        await withTransientRetry(() =>
+                            db.transaction(async (tx) => {
+                                await recordWaiverAcceptance(
+                                    sessionUser.id,
+                                    activeWaiver.id,
+                                    undefined,
                                     tx
-                                ),
-                                context: "At signup"
-                            },
-                            tx
-                        )
+                                )
 
-                        await tx
-                            .delete(waitlist)
+                                const [newSignup] = await tx
+                                    .insert(signups)
+                                    .values({
+                                        season: seasonId,
+                                        player: sessionUser.id,
+                                        order_id: payment.id,
+                                        amount_paid: finalAmount,
+                                        age: formData.age,
+                                        captain: formData.captain,
+                                        pair: formData.pair,
+                                        pair_pick: formData.pairPick,
+                                        pair_reason: formData.pairReason,
+                                        ref_interest:
+                                            formData.refInterest === true,
+                                        tryout_help:
+                                            formData.tryoutHelp === true,
+                                        created_at: new Date()
+                                    })
+                                    .returning({ id: signups.id })
+
+                                if (
+                                    formData.unavailableEventIds.length > 0 &&
+                                    newSignup
+                                ) {
+                                    await tx.insert(userUnavailability).values(
+                                        formData.unavailableEventIds.map(
+                                            (eventId) => ({
+                                                user_id: sessionUser.id,
+                                                signup_id: newSignup.id,
+                                                event_id: eventId
+                                            })
+                                        )
+                                    )
+                                }
+
+                                await logAvailabilityChange(
+                                    {
+                                        userId: sessionUser.id,
+                                        entityId: newSignup.id,
+                                        events: await selectEventDates(
+                                            formData.unavailableEventIds,
+                                            tx
+                                        ),
+                                        context: "At signup"
+                                    },
+                                    tx
+                                )
+
+                                await tx
+                                    .delete(waitlist)
+                                    .where(
+                                        and(
+                                            eq(waitlist.season, seasonId),
+                                            eq(waitlist.user, sessionUser.id)
+                                        )
+                                    )
+
+                                if (discountId && discountInfo) {
+                                    await markDiscountAsUsed(
+                                        discountId,
+                                        tx,
+                                        newSignup.id
+                                    )
+                                }
+
+                                await logAuditEntry(
+                                    {
+                                        userId: sessionUser.id,
+                                        action: "create",
+                                        entityType: "signups",
+                                        summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
+                                    },
+                                    tx
+                                )
+                            })
+                        )
+                    } catch (dbError) {
+                        // The usual cause is a second submission racing this one past
+                        // the availability check: the (season, player) unique index
+                        // stopped the second insert, so tell the two cases apart.
+                        const [existing] = await db
+                            .select({ orderId: signups.order_id })
+                            .from(signups)
                             .where(
                                 and(
-                                    eq(waitlist.season, seasonId),
-                                    eq(waitlist.user, sessionUser.id)
+                                    eq(signups.season, seasonId),
+                                    eq(signups.player, sessionUser.id)
                                 )
                             )
-
-                        if (discountId && discountInfo) {
-                            await markDiscountAsUsed(
-                                discountId,
-                                tx,
-                                newSignup.id
-                            )
+                            .limit(1)
+                            .catch(() => [])
+                        if (existing?.orderId === payment.id) {
+                            // Same card token resubmitted: Square returned the
+                            // original payment for our idempotency key, so nothing
+                            // was charged twice and the signup already exists.
+                            return {
+                                status: true,
+                                message:
+                                    "Payment successful! You are now registered for the season.",
+                                paymentId: payment.id,
+                                receiptUrl: payment.receiptUrl
+                            }
                         }
-
-                        await logAuditEntry(
+                        if (existing) {
+                            logger.error(
+                                "CRITICAL: duplicate season charge — the player was already registered by another payment. Refund this payment.",
+                                {
+                                    paymentId: payment.id,
+                                    existingOrderId: existing.orderId,
+                                    userId: sessionUser.id,
+                                    seasonId,
+                                    amount: finalAmount
+                                }
+                            )
+                            return {
+                                status: false,
+                                message:
+                                    "You were already registered by an earlier payment, so this second charge will be refunded. Please don't pay again.",
+                                paymentId: payment.id,
+                                receiptUrl: payment.receiptUrl,
+                                shouldRefresh: true
+                            }
+                        }
+                        logger.error(
+                            "CRITICAL: Square payment succeeded but the signup transaction failed — manual reconciliation required.",
                             {
+                                paymentId: payment.id,
                                 userId: sessionUser.id,
-                                action: "create",
-                                entityType: "signups",
-                                summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
+                                seasonId,
+                                amount: finalAmount
                             },
-                            tx
+                            dbError
                         )
-                    })
-                )
-            } catch (dbError) {
-                // The usual cause is a second submission racing this one past
-                // the availability check: the (season, player) unique index
-                // stopped the second insert, so tell the two cases apart.
-                const [existing] = await db
-                    .select({ orderId: signups.order_id })
-                    .from(signups)
-                    .where(
-                        and(
-                            eq(signups.season, seasonId),
-                            eq(signups.player, sessionUser.id)
-                        )
+                        return {
+                            status: false,
+                            message:
+                                "Your payment went through, but we hit a problem finishing your registration. Please contact us and do NOT pay again — we'll complete your signup manually.",
+                            paymentId: payment.id,
+                            receiptUrl: payment.receiptUrl
+                        }
+                    }
+
+                    // Get user's first name for the email
+                    const [user] = await db
+                        .select({
+                            firstName: users.first_name,
+                            preferredName: users.preferred_name
+                        })
+                        .from(users)
+                        .where(eq(users.id, sessionUser.id))
+                        .limit(1)
+
+                    const firstName =
+                        user?.preferredName ||
+                        user?.firstName ||
+                        sessionUser.email.split("@")[0]
+
+                    // Awaited on purpose. This used to be fire-and-forget to
+                    // shave a round-trip off the response, but work started
+                    // after a serverless response returns is not guaranteed to
+                    // run — which risked dropping both the receipt and its
+                    // notification_log row. A payment the member just waited on
+                    // can afford one more round-trip.
+                    await sendSignupConfirmationEmail(
+                        sessionUser.id,
+                        sessionUser.email,
+                        firstName,
+                        config.seasonName,
+                        config.seasonYear,
+                        finalAmount,
+                        response.payment.receiptUrl,
+                        discountInfo
                     )
-                    .limit(1)
-                    .catch(() => [])
-                if (existing?.orderId === payment.id) {
-                    // Same card token resubmitted: Square returned the
-                    // original payment for our idempotency key, so nothing
-                    // was charged twice and the signup already exists.
+
+                    revalidateCalendarFeeds()
                     return {
                         status: true,
                         message:
                             "Payment successful! You are now registered for the season.",
-                        paymentId: payment.id,
-                        receiptUrl: payment.receiptUrl
+                        paymentId: response.payment.id,
+                        receiptUrl: response.payment.receiptUrl
                     }
                 }
-                if (existing) {
-                    logger.error(
-                        "CRITICAL: duplicate season charge — the player was already registered by another payment. Refund this payment.",
-                        {
-                            paymentId: payment.id,
-                            existingOrderId: existing.orderId,
-                            userId: sessionUser.id,
-                            seasonId,
-                            amount: finalAmount
-                        }
-                    )
-                    return {
-                        status: false,
-                        message:
-                            "You were already registered by an earlier payment, so this second charge will be refunded. Please don't pay again.",
-                        paymentId: payment.id,
-                        receiptUrl: payment.receiptUrl,
-                        shouldRefresh: true
-                    }
-                }
-                logger.error(
-                    "CRITICAL: Square payment succeeded but the signup transaction failed — manual reconciliation required.",
-                    {
-                        paymentId: payment.id,
-                        userId: sessionUser.id,
-                        seasonId,
-                        amount: finalAmount
-                    },
-                    dbError
-                )
+
                 return {
                     status: false,
-                    message:
-                        "Your payment went through, but we hit a problem finishing your registration. Please contact us and do NOT pay again — we'll complete your signup manually.",
-                    paymentId: payment.id,
-                    receiptUrl: payment.receiptUrl
+                    message: "Payment processing failed. Please try again."
                 }
             }
-
-            // Get user's first name for the email
-            const [user] = await db
-                .select({
-                    firstName: users.first_name,
-                    preferredName: users.preferred_name
-                })
-                .from(users)
-                .where(eq(users.id, sessionUser.id))
-                .limit(1)
-
-            const firstName =
-                user?.preferredName ||
-                user?.firstName ||
-                sessionUser.email.split("@")[0]
-
-            // Awaited on purpose. This used to be fire-and-forget to
-            // shave a round-trip off the response, but work started
-            // after a serverless response returns is not guaranteed to
-            // run — which risked dropping both the receipt and its
-            // notification_log row. A payment the member just waited on
-            // can afford one more round-trip.
-            await sendSignupConfirmationEmail(
-                sessionUser.id,
-                sessionUser.email,
-                firstName,
-                config.seasonName,
-                config.seasonYear,
-                finalAmount,
-                response.payment.receiptUrl,
-                discountInfo
-            )
-
-            revalidateCalendarFeeds()
-            return {
-                status: true,
-                message:
-                    "Payment successful! You are now registered for the season.",
-                paymentId: response.payment.id,
-                receiptUrl: response.payment.receiptUrl
-            }
-        }
-
-        return {
-            status: false,
-            message: "Payment processing failed. Please try again."
-        }
+        )
     } catch (error) {
         logger.error("Payment error", undefined, error)
         return {

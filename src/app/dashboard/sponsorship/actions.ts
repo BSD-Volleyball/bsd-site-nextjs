@@ -14,6 +14,7 @@ import {
 } from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { withTransientRetry } from "@/lib/db-retry"
+import { withSerializedPayment } from "@/lib/payment-lock"
 import { buildSponsorshipReceiptHtml } from "@/lib/email-html"
 import { sendMail } from "@/lib/email/send"
 import { logger } from "@/lib/logger"
@@ -96,139 +97,161 @@ export async function submitSponsorshipPayment(
     }
 
     try {
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return { status: false, message: "Season not found." }
-        }
+        // One payment at a time per contact: a second tab's pre-check waits
+        // for the first to record, then sees "already paid".
+        return await withSerializedPayment(
+            `sponsorship:${sessionUser.id}`,
+            async () => {
+                const config = await getSeasonConfig()
+                if (!config.seasonId) {
+                    return { status: false, message: "Season not found." }
+                }
 
-        let own: Awaited<ReturnType<typeof loadOwnSponsorship>>
-        try {
-            own = await loadOwnSponsorship(sessionUser.id, config.seasonId)
-        } catch {
-            return {
-                status: false,
-                message:
-                    "No sponsorship is set up for your account this season."
-            }
-        }
-        if (own.status === "paid") {
-            return {
-                status: false,
-                message: "This sponsorship is already paid. Thank you!"
-            }
-        }
-
-        // The amount is whatever the admin recorded — never the client's.
-        const amount = own.amount
-        const amountCents = BigInt(Math.round(Number.parseFloat(amount) * 100))
-        if (amountCents <= 0n) {
-            return { status: false, message: "Invalid sponsorship amount." }
-        }
-
-        const seasonLabel = formatSeasonLabel(config)
-        const response = await getSquareClient().payments.create({
-            idempotencyKey: chargeIdempotencyKey(
-                "sponsorship",
-                sessionUser.id,
-                own.sponsorshipId,
-                sourceId,
-                amountCents
-            ),
-            sourceId,
-            amountMoney: { currency: "USD", amount: amountCents },
-            buyerEmailAddress: sessionUser.email,
-            note: `Volleyball ${seasonLabel} Sponsorship - ${own.sponsorName}`
-        })
-
-        const payment = response.payment
-        if (!payment) {
-            return {
-                status: false,
-                message: "Payment processing failed. Please try again."
-            }
-        }
-
-        // The card is charged from here on. Persist inside one retried
-        // transaction; if that still fails, say so loudly and stop the
-        // member from paying twice.
-        try {
-            await withTransientRetry(() =>
-                db.transaction(async (tx) => {
-                    const flipped = await markSponsorshipPaid(tx, {
-                        sponsorshipId: own.sponsorshipId,
-                        method: "square",
-                        amountPaid: amount,
-                        orderId: payment.id,
-                        receiptUrl: payment.receiptUrl
-                    })
-                    if (!flipped) {
-                        throw new Error(
-                            "Sponsorship was no longer pending when recording payment"
-                        )
-                    }
-                    await logAuditEntry(
-                        {
-                            userId: sessionUser.id,
-                            action: "update",
-                            entityType: "sponsorships",
-                            entityId: own.sponsorshipId,
-                            summary: `Paid $${amount} sponsorship for ${own.sponsorName} (${seasonLabel}) via Square ${payment.id}`
-                        },
-                        tx
+                let own: Awaited<ReturnType<typeof loadOwnSponsorship>>
+                try {
+                    own = await loadOwnSponsorship(
+                        sessionUser.id,
+                        config.seasonId
                     )
+                } catch {
+                    return {
+                        status: false,
+                        message:
+                            "No sponsorship is set up for your account this season."
+                    }
+                }
+                if (own.status === "paid") {
+                    return {
+                        status: false,
+                        message: "This sponsorship is already paid. Thank you!"
+                    }
+                }
+
+                // The amount is whatever the admin recorded — never the client's.
+                const amount = own.amount
+                const amountCents = BigInt(
+                    Math.round(Number.parseFloat(amount) * 100)
+                )
+                if (amountCents <= 0n) {
+                    return {
+                        status: false,
+                        message: "Invalid sponsorship amount."
+                    }
+                }
+
+                const seasonLabel = formatSeasonLabel(config)
+                const response = await getSquareClient().payments.create({
+                    idempotencyKey: chargeIdempotencyKey(
+                        "sponsorship",
+                        sessionUser.id,
+                        own.sponsorshipId,
+                        sourceId,
+                        amountCents
+                    ),
+                    sourceId,
+                    amountMoney: { currency: "USD", amount: amountCents },
+                    buyerEmailAddress: sessionUser.email,
+                    note: `Volleyball ${seasonLabel} Sponsorship - ${own.sponsorName}`
                 })
-            )
-        } catch (dbError) {
-            logger.error(
-                "CRITICAL: Square payment succeeded but the sponsorship transaction failed — manual reconciliation required.",
-                {
+
+                const payment = response.payment
+                if (!payment) {
+                    return {
+                        status: false,
+                        message: "Payment processing failed. Please try again."
+                    }
+                }
+
+                // The card is charged from here on. Persist inside one retried
+                // transaction; if that still fails, say so loudly and stop the
+                // member from paying twice.
+                try {
+                    await withTransientRetry(() =>
+                        db.transaction(async (tx) => {
+                            const flipped = await markSponsorshipPaid(tx, {
+                                sponsorshipId: own.sponsorshipId,
+                                method: "square",
+                                amountPaid: amount,
+                                orderId: payment.id,
+                                receiptUrl: payment.receiptUrl
+                            })
+                            if (!flipped) {
+                                throw new Error(
+                                    "Sponsorship was no longer pending when recording payment"
+                                )
+                            }
+                            await logAuditEntry(
+                                {
+                                    userId: sessionUser.id,
+                                    action: "update",
+                                    entityType: "sponsorships",
+                                    entityId: own.sponsorshipId,
+                                    summary: `Paid $${amount} sponsorship for ${own.sponsorName} (${seasonLabel}) via Square ${payment.id}`
+                                },
+                                tx
+                            )
+                        })
+                    )
+                } catch (dbError) {
+                    logger.error(
+                        "CRITICAL: Square payment succeeded but the sponsorship transaction failed — manual reconciliation required.",
+                        {
+                            paymentId: payment.id,
+                            userId: sessionUser.id,
+                            sponsorshipId: own.sponsorshipId,
+                            amount
+                        },
+                        dbError
+                    )
+                    return {
+                        status: false,
+                        message:
+                            "Your payment went through, but we hit a problem recording it. Please contact us and do NOT pay again — we'll mark your sponsorship paid manually.",
+                        paymentId: payment.id,
+                        receiptUrl: payment.receiptUrl
+                    }
+                }
+
+                // Awaited: work after a serverless response is not guaranteed to run.
+                const contact = await getContactDisplay(sessionUser.id)
+                await sendMail({
+                    mode: {
+                        kind: "transactional",
+                        category: "sponsorship_receipt"
+                    },
+                    recipients: [
+                        { userId: sessionUser.id, email: sessionUser.email }
+                    ],
+                    subject: `Sponsorship payment received — ${own.sponsorName}`,
+                    htmlBody: buildSponsorshipReceiptHtml({
+                        firstName:
+                            contact?.firstName ??
+                            sessionUser.email.split("@")[0],
+                        sponsorName: own.sponsorName,
+                        seasonLabel,
+                        amountPaid: amount,
+                        receiptUrl: payment.receiptUrl
+                    }),
+                    tag: "sponsorship-receipt"
+                })
+                await notifyAdminsSponsorshipPaid({
+                    sponsorName: own.sponsorName,
+                    contactName: contact?.fullName ?? sessionUser.email,
+                    amount,
+                    method: "square",
+                    actorUserId: sessionUser.id
+                })
+
+                revalidateSponsorPages()
+                return {
+                    status: true,
+                    message:
+                        "Payment successful! Thank you for sponsoring the league.",
                     paymentId: payment.id,
-                    userId: sessionUser.id,
-                    sponsorshipId: own.sponsorshipId,
-                    amount
-                },
-                dbError
-            )
-            return {
-                status: false,
-                message:
-                    "Your payment went through, but we hit a problem recording it. Please contact us and do NOT pay again — we'll mark your sponsorship paid manually.",
-                paymentId: payment.id,
-                receiptUrl: payment.receiptUrl
+                    receiptUrl: payment.receiptUrl
+                }
             }
-        }
-
-        // Awaited: work after a serverless response is not guaranteed to run.
-        const contact = await getContactDisplay(sessionUser.id)
-        await sendMail({
-            mode: { kind: "transactional", category: "sponsorship_receipt" },
-            recipients: [{ userId: sessionUser.id, email: sessionUser.email }],
-            subject: `Sponsorship payment received — ${own.sponsorName}`,
-            htmlBody: buildSponsorshipReceiptHtml({
-                firstName:
-                    contact?.firstName ?? sessionUser.email.split("@")[0],
-                sponsorName: own.sponsorName,
-                seasonLabel,
-                amountPaid: amount,
-                receiptUrl: payment.receiptUrl
-            }),
-            tag: "sponsorship-receipt"
-        })
-        await notifyAdminsSponsorshipPaid({
-            sponsorName: own.sponsorName,
-            contactName: contact?.fullName ?? sessionUser.email,
-            amount,
-            method: "square",
-            actorUserId: sessionUser.id
-        })
-
-        revalidateSponsorPages()
-        return {
-            status: true,
-            message: "Payment successful! Thank you for sponsoring the league.",
-            paymentId: payment.id,
-            receiptUrl: payment.receiptUrl
-        }
+        )
     } catch (error) {
         logger.error(
             "Sponsorship payment error",

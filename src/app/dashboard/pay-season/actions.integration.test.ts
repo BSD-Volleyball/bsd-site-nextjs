@@ -308,6 +308,24 @@ describe("submitSeasonPayment", () => {
         expect(paymentsCreate).not.toHaveBeenCalled()
     })
 
+    // Two tabs, one card: the second request waits for the first to record
+    // its signup and is then turned away before charging.
+    it("charges once when the same player submits twice at once", async () => {
+        await createUserWithRoles([])
+
+        const results = await Promise.all([
+            submitSeasonPayment("src-token", formData, waiverId),
+            submitSeasonPayment("src-token", formData, waiverId)
+        ])
+
+        expect(paymentsCreate).toHaveBeenCalledTimes(1)
+        expect(results.filter((r) => r.status)).toHaveLength(1)
+        const refused = results.find((r) => !r.status)
+        expect(refused?.message).toBe(
+            "You are already registered for this season."
+        )
+    })
+
     it("reports a failure when Square returns no payment", async () => {
         const player = await createUserWithRoles([])
         paymentsCreate.mockResolvedValue({})
