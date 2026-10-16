@@ -100,6 +100,7 @@ vi.mock("@/lib/r2", () => ({
     deleteR2Object: vi.fn(async () => {}),
     putR2Object: vi.fn(async () => {}),
     getR2Object: vi.fn(async () => null),
+    headR2Object: vi.fn(async () => null),
     createAttachmentDownloadPresignedUrl: vi.fn(
         async () => "https://r2.test/presigned-download"
     )

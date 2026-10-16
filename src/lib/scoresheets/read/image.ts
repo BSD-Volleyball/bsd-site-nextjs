@@ -46,6 +46,13 @@ export function grayToRgba(img: RasterImage): Uint8ClampedArray {
  * caller error rather than a case to handle.
  */
 export function decodeJpeg(bytes: Uint8Array): RasterImage {
-    const decoded = decodeJpegBuffer(bytes, { useTArray: true })
+    // A 10 MB upload can encode far more pixels than a phone photo holds;
+    // decoding is RGBA, so the caps keep one hostile file from taking the
+    // function's whole memory. 30 MP is well above any phone camera.
+    const decoded = decodeJpegBuffer(bytes, {
+        useTArray: true,
+        maxResolutionInMP: 30,
+        maxMemoryUsageInMB: 256
+    })
     return grayFromRgba(decoded.data, decoded.width, decoded.height)
 }

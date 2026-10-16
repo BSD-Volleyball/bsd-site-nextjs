@@ -332,6 +332,65 @@ describe("processScoreSheet", () => {
         expect(row.attempts).toBe(3)
     })
 
+    // Each attempt costs two model calls. Requests that arrive together must
+    // share the three attempts, not take three each.
+    it("shares the attempts between concurrent reads", async () => {
+        const { seasonId } = await seedNight()
+        const { scoreSheetId } = await uploadPhoto({ seasonId })
+        mockedGetR2.mockResolvedValue(null)
+
+        const results = await Promise.all(
+            Array.from({ length: 6 }, () =>
+                processScoreSheet({ scoreSheetId, seasonId, readers: [] })
+            )
+        )
+
+        const [row] = await db
+            .select()
+            .from(scoreSheetReads)
+            .where(eq(scoreSheetReads.score_sheet_id, scoreSheetId))
+        // One read in flight at a time, and never more than three in all
+        expect(row.attempts).toBeGreaterThanOrEqual(1)
+        expect(row.attempts).toBeLessThanOrEqual(3)
+        const refused = results.filter((r) =>
+            /already been tried|being read right now/.test(r.problems.join(" "))
+        )
+        expect(refused.length + row.attempts).toBe(results.length)
+    })
+
+    it("refuses a photo whose QR names some other night", async () => {
+        const { seasonId } = await seedNight()
+        const { scoreSheetId } = await uploadPhoto({ seasonId })
+        const night = await loadScoreSheetNight(seasonId, NIGHT)
+        if (!night) throw new Error("night missing")
+        // Last week's court-1 sheet, uploaded under tonight
+        const stale = sheetTag(night, 1).replace(NIGHT, "2026-09-28")
+        const bytes = tagPhoto(stale)
+        mockedGetR2.mockImplementation(
+            async () =>
+                ({
+                    body: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(bytes)
+                            controller.close()
+                        }
+                    }),
+                    contentType: "image/jpeg",
+                    contentLength: bytes.length
+                }) as never
+        )
+
+        const result = await processScoreSheet({
+            scoreSheetId,
+            seasonId,
+            readers: pair()
+        })
+
+        expect(result.status).toBe("unidentified")
+        expect(result.problems[0]).toContain("2026-09-28")
+        expect(await storedCourt(scoreSheetId)).toBeNull()
+    })
+
     it("still identifies the sheet with no readers configured", async () => {
         const { seasonId } = await seedNight()
         const { scoreSheetId } = await uploadPhoto({ seasonId })

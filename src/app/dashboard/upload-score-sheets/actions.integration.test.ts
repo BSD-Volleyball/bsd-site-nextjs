@@ -7,7 +7,7 @@ import {
     scoreSheetReads,
     scoreSheets
 } from "@/database/schema"
-import { getR2Object } from "@/lib/r2"
+import { deleteR2Object, headR2Object } from "@/lib/r2"
 import {
     createDivision,
     createMatch,
@@ -24,13 +24,16 @@ import {
     deleteUploadedSheet,
     finalizeSheetUpload,
     getScoringNight,
-    getSheetInbox,
-    peekSheetRead,
     readUploadedSheet
 } from "./actions"
 
 const NIGHT = "2026-10-05"
-const mockedGetR2 = vi.mocked(getR2Object)
+const mockedHeadR2 = vi.mocked(headR2Object)
+const mockedDeleteR2 = vi.mocked(deleteR2Object)
+
+/** A key shaped like the one createSheetUpload hands out. */
+const sheetKey = (seasonId: number, uuid = crypto.randomUUID()) =>
+    `scoresheets/${seasonId}/${NIGHT}/sheet_${uuid}.jpg`
 
 async function seedNight() {
     const season = await createSeason({ phase: "in_season" })
@@ -61,21 +64,16 @@ async function seedNight() {
 
 /** Pretend the presigned PUT landed. */
 function storeExists() {
-    mockedGetR2.mockResolvedValue({
-        body: new ReadableStream({
-            start(c) {
-                c.enqueue(new Uint8Array([1, 2, 3]))
-                c.close()
-            }
-        }),
+    mockedHeadR2.mockResolvedValue({
         contentType: "image/jpeg",
         contentLength: 3
-    } as never)
+    })
 }
 
 describe("score sheet inbox actions", () => {
     beforeEach(() => {
-        mockedGetR2.mockReset()
+        mockedHeadR2.mockReset()
+        mockedDeleteR2.mockReset()
     })
 
     describe("authorization", () => {
@@ -84,12 +82,10 @@ describe("score sheet inbox actions", () => {
             await createUserWithRoles([])
 
             for (const result of [
-                await getSheetInbox(NIGHT),
                 await getScoringNight(NIGHT),
                 await createSheetUpload({ date: NIGHT, contentLength: 100 }),
                 await finalizeSheetUpload({ date: NIGHT, objectKey: "x" }),
                 await readUploadedSheet({ scoreSheetId: 1 }),
-                await peekSheetRead(1),
                 await deleteUploadedSheet(1)
             ]) {
                 expect(result).toEqual({
@@ -99,7 +95,7 @@ describe("score sheet inbox actions", () => {
             }
 
             logout()
-            expect(await getSheetInbox(NIGHT)).toEqual({
+            expect(await getScoringNight(NIGHT)).toEqual({
                 status: false,
                 message: "Unauthorized."
             })
@@ -108,7 +104,7 @@ describe("score sheet inbox actions", () => {
         it("lets a referee in, since they may already enter scores", async () => {
             await seedNight()
             await createUserWithRoles([{ role: "referee" }])
-            const result = await getSheetInbox(NIGHT)
+            const result = await getScoringNight(NIGHT)
             expect(result.status).toBe(true)
         })
     })
@@ -146,32 +142,68 @@ describe("score sheet inbox actions", () => {
                     contentLength: 100
                 })
             ).toMatchObject({ status: false })
+            // Shaped like a date, but not one
+            expect(
+                await createSheetUpload({
+                    date: "2026-99-99",
+                    contentLength: 100
+                })
+            ).toMatchObject({ status: false })
         })
 
-        it("refuses a key belonging to another night", async () => {
-            await seedNight()
+        it("refuses a key belonging to another night, or not shaped like ours", async () => {
+            const { seasonId } = await seedNight()
             await createUserWithRoles([{ role: "admin" }])
             storeExists()
 
-            const result = await finalizeSheetUpload({
-                date: NIGHT,
-                objectKey: "scoresheets/999/2020-01-01/sheet_x.jpg"
-            })
-            expect(result).toMatchObject({ status: false })
-            expect(result.message).toContain("does not belong")
+            for (const objectKey of [
+                `scoresheets/999/2020-01-01/sheet_${crypto.randomUUID()}.jpg`,
+                // Right night, but a name createSheetUpload never issued
+                `scoresheets/${seasonId}/${NIGHT}/sheet_x.jpg`,
+                `scoresheets/${seasonId}/${NIGHT}/div3_1700000000.jpg`
+            ]) {
+                const result = await finalizeSheetUpload({
+                    date: NIGHT,
+                    objectKey
+                })
+                expect(result).toMatchObject({ status: false })
+                expect(result.message).toContain("does not belong")
+            }
         })
 
         it("refuses to record an upload that never arrived", async () => {
             const { seasonId } = await seedNight()
             await createUserWithRoles([{ role: "admin" }])
-            mockedGetR2.mockResolvedValue(null)
+            mockedHeadR2.mockResolvedValue(null)
 
             const result = await finalizeSheetUpload({
                 date: NIGHT,
-                objectKey: `scoresheets/${seasonId}/${NIGHT}/sheet_a.jpg`
+                objectKey: sheetKey(seasonId)
             })
             expect(result).toMatchObject({ status: false })
             expect(result.message).toContain("did not complete")
+        })
+
+        // Every read costs two model calls and a photo gets three tries, so
+        // re-filing one object must not start the count again.
+        it("files each uploaded object once", async () => {
+            const { seasonId } = await seedNight()
+            await createUserWithRoles([{ role: "admin" }])
+            storeExists()
+            const objectKey = sheetKey(seasonId)
+
+            const first = await finalizeSheetUpload({ date: NIGHT, objectKey })
+            expect(first.status).toBe(true)
+            const again = await finalizeSheetUpload({ date: NIGHT, objectKey })
+            expect(again).toMatchObject({ status: false })
+            expect(again.message).toContain("already uploaded")
+
+            expect(
+                await db
+                    .select()
+                    .from(scoreSheets)
+                    .where(eq(scoreSheets.image_path, objectKey))
+            ).toHaveLength(1)
         })
 
         it("records an arrived upload as pending and lists it", async () => {
@@ -183,7 +215,7 @@ describe("score sheet inbox actions", () => {
             })
             storeExists()
 
-            const key = `scoresheets/${seasonId}/${NIGHT}/sheet_b.jpg`
+            const key = sheetKey(seasonId)
             const finalized = await finalizeSheetUpload({
                 date: NIGHT,
                 objectKey: key
@@ -202,11 +234,11 @@ describe("score sheet inbox actions", () => {
                 )
             expect(read.status).toBe("pending")
 
-            const inbox = await getSheetInbox(NIGHT)
+            const inbox = await getScoringNight(NIGHT)
             expect(inbox.status).toBe(true)
             if (!inbox.status) return
-            expect(inbox.data).toHaveLength(1)
-            expect(inbox.data[0]).toMatchObject({
+            expect(inbox.data.rows).toHaveLength(1)
+            expect(inbox.data.rows[0]).toMatchObject({
                 status: "pending",
                 court: null,
                 imagePath: key,
@@ -232,7 +264,7 @@ describe("score sheet inbox actions", () => {
             storeExists()
             await finalizeSheetUpload({
                 date: NIGHT,
-                objectKey: `scoresheets/${seasonId}/${NIGHT}/sheet_c.jpg`
+                objectKey: sheetKey(seasonId)
             })
 
             const before = await getScoringNight(NIGHT)
@@ -265,20 +297,23 @@ describe("score sheet inbox actions", () => {
     })
 
     describe("removing", () => {
-        it("deletes an upload and its read together", async () => {
+        it("deletes an upload, its read and the stored photo together", async () => {
             const { seasonId } = await seedNight()
             await createUserWithRoles([{ role: "admin" }])
             storeExists()
+            const objectKey = sheetKey(seasonId)
 
             const finalized = await finalizeSheetUpload({
                 date: NIGHT,
-                objectKey: `scoresheets/${seasonId}/${NIGHT}/sheet_c.jpg`
+                objectKey
             })
             if (!finalized.status) throw new Error("upload failed")
 
             expect(
                 await deleteUploadedSheet(finalized.data.scoreSheetId)
             ).toMatchObject({ status: true })
+            // The bucket is public by key, so the object goes too
+            expect(mockedDeleteR2).toHaveBeenCalledWith(objectKey)
 
             expect(
                 await db

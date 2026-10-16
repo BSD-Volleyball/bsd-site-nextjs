@@ -9,12 +9,12 @@ import { logAuditEntry } from "@/lib/audit-log"
 import {
     PLAYER_PICTURE_MAX_BYTES,
     createPlayerPictureUploadPresignedUrl,
-    getR2Object
+    deleteR2Object,
+    headR2Object
 } from "@/lib/r2"
 import { shortPersonName } from "@/lib/scores/entered-by"
 import type { SheetRead } from "@/lib/scoresheets/read/read"
 import {
-    getScoreSheetRead,
     processScoreSheet,
     type StoredReadStatus
 } from "@/lib/scoresheets/read/pipeline"
@@ -35,6 +35,9 @@ import {
 } from "../enter-scores/actions"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+/** The key createSheetUpload issues: a UUID, so one object cannot be guessed from another. */
+const SHEET_FILE_RE =
+    /^sheet_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/
 
 /**
  * Same gate as the score-entry page this feeds: anyone trusted to type the
@@ -45,6 +48,15 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 function requireDate(date: string): string {
     if (!DATE_RE.test(date)) throw new ActionError("Invalid date.")
+    // A pattern match lets 2026-99-99 through to Postgres; a round trip
+    // through the calendar does not.
+    const parsed = new Date(`${date}T00:00:00Z`)
+    if (
+        Number.isNaN(parsed.getTime()) ||
+        parsed.toISOString().slice(0, 10) !== date
+    ) {
+        throw new ActionError("Invalid date.")
+    }
     return date
 }
 
@@ -123,16 +135,6 @@ async function loadInboxRows(
     })
 }
 
-export const getSheetInbox = withAction(
-    async (date: string): Promise<ActionResult<SheetInboxRow[]>> => {
-        const config = await requireSeasonConfig()
-        await requirePermission("scores:enter", {
-            seasonId: config.seasonId
-        })
-        return ok(await loadInboxRows(config.seasonId, requireDate(date)))
-    }
-)
-
 export interface ScoringNight {
     divisions: DivisionMatchGroup[]
     rows: SheetInboxRow[]
@@ -210,15 +212,22 @@ export const finalizeSheetUpload = withAction(
         if (!userId) throw new ActionError("Unauthorized.")
 
         const expectedPrefix = `scoresheets/${seasonId}/${day}/`
-        if (!input.objectKey.startsWith(expectedPrefix)) {
+        if (
+            typeof input.objectKey !== "string" ||
+            !input.objectKey.startsWith(expectedPrefix) ||
+            !SHEET_FILE_RE.test(input.objectKey.slice(expectedPrefix.length))
+        ) {
             throw new ActionError("That upload does not belong to this night.")
         }
 
         // Confirm the bytes actually arrived, rather than trusting the client
         // to tell us about an object we never see again.
-        const stored = await getR2Object(input.objectKey)
+        const stored = await headR2Object(input.objectKey)
         if (!stored) throw new ActionError("The upload did not complete.")
 
+        // Each read costs two model calls and a photo gets three tries, so
+        // filing the same object twice must not start the count again. The
+        // unique index on image_path is what makes this hold under a race.
         const [row] = await db
             .insert(scoreSheets)
             .values({
@@ -229,7 +238,9 @@ export const finalizeSheetUpload = withAction(
                 image_path: input.objectKey,
                 uploaded_by: userId
             })
+            .onConflictDoNothing({ target: scoreSheets.image_path })
             .returning()
+        if (!row) throw new ActionError("That photo is already uploaded.")
 
         await db.insert(scoreSheetReads).values({
             score_sheet_id: row.id,
@@ -321,6 +332,9 @@ export const deleteUploadedSheet = withAction(
         }
 
         await db.delete(scoreSheets).where(eq(scoreSheets.id, scoreSheetId))
+        // The bucket is public by key, so "removed" has to mean gone from
+        // storage too, not only from the list.
+        await deleteR2Object(row.image_path)
         await logAuditEntry({
             userId,
             action: "delete",
@@ -329,17 +343,5 @@ export const deleteUploadedSheet = withAction(
             summary: `Deleted score sheet photo for ${row.match_date}`
         })
         return ok(undefined, "Photo removed.")
-    }
-)
-
-/** Read a stored result without re-processing, for the review screen. */
-export const peekSheetRead = withAction(
-    async (scoreSheetId: number): Promise<ActionResult<SheetRead | null>> => {
-        const config = await requireSeasonConfig()
-        await requirePermission("scores:enter", {
-            seasonId: config.seasonId
-        })
-        const row = await getScoreSheetRead(scoreSheetId)
-        return ok((row?.result as SheetRead | null) ?? null)
     }
 )

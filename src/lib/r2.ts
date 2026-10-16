@@ -2,6 +2,7 @@ import "server-only"
 import {
     DeleteObjectCommand,
     GetObjectCommand,
+    HeadObjectCommand,
     PutObjectCommand,
     S3Client
 } from "@aws-sdk/client-s3"
@@ -169,6 +170,29 @@ interface R2ObjectStream {
     body: ReadableStream
     contentType: string | null
     contentLength: number | null
+}
+
+/** The object's metadata without its bytes, or null when the key doesn't exist. */
+export async function headR2Object(
+    key: string,
+    scope: R2Scope = "public"
+): Promise<{
+    contentType: string | null
+    contentLength: number | null
+} | null> {
+    try {
+        const result = await getR2Client().send(
+            new HeadObjectCommand({ Bucket: getR2Bucket(scope), Key: key })
+        )
+        return {
+            contentType: result.ContentType ?? null,
+            contentLength: result.ContentLength ?? null
+        }
+    } catch (error) {
+        const name = (error as { name?: string }).name
+        if (name === "NotFound" || name === "NoSuchKey") return null
+        throw error
+    }
 }
 
 /** Fetch an object as a web stream, or null when the key doesn't exist. */

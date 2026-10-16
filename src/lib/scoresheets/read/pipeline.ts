@@ -8,7 +8,7 @@
  * fakes and no network.
  */
 
-import { eq } from "drizzle-orm"
+import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm"
 
 import { db } from "@/database/db"
 import { scoreSheetReads, scoreSheets } from "@/database/schema"
@@ -139,6 +139,11 @@ async function resolveLayout(
     // untagged photo needs the court from somewhere else.
     let court: number | null
     if (tag) {
+        // The tag is trusted for the court and the print record, so it has
+        // to be this night's: last week's sheet uploaded under tonight would
+        // otherwise be read against last week's matches and filed here.
+        const mismatch = tagNightMismatch(tag, matchDate, night)
+        if (mismatch) return { problem: mismatch }
         court = tag.parts.court
     } else {
         const found =
@@ -195,6 +200,23 @@ async function resolveLayout(
     }
 }
 
+/** A problem to report when a decoded tag names some other night, else null. */
+function tagNightMismatch(
+    tag: IdentityResult,
+    matchDate: string,
+    night: SheetNight | null
+): string | null {
+    const parts = tag.parts
+    const sameNight =
+        parts.date === matchDate &&
+        (!night ||
+            (parts.seasonCode === night.seasonCode &&
+                parts.phase === (night.eventType === "playoff" ? "P" : "W") &&
+                parts.ordinal === night.ordinal))
+    if (sameNight) return null
+    return `This sheet's code says it is from ${parts.date}, not ${matchDate}. Check the photo was uploaded to the right date.`
+}
+
 /**
  * Ask the first reader for the printed code, and check it belongs to this
  * night. Returns the court, null when nothing legible came back, or a problem
@@ -243,29 +265,24 @@ export async function processScoreSheet(
         return { status: "failed", read: null, problems: ["No such upload."] }
     }
 
-    const [existing] = await db
-        .select()
-        .from(scoreSheetReads)
-        .where(eq(scoreSheetReads.score_sheet_id, opts.scoreSheetId))
-        .limit(1)
-
-    if (existing && existing.attempts >= MAX_ATTEMPTS) {
+    const claimed = await claimAttempt(opts.scoreSheetId)
+    if (claimed.kind === "busy") {
         return {
-            status: existing.status as StoredReadStatus,
+            status: "processing",
+            read: null,
+            problems: ["This photo is being read right now."]
+        }
+    }
+    if (claimed.kind === "exhausted") {
+        return {
+            status: claimed.status,
             read: null,
             problems: [
                 "This photo has already been tried several times. Retake it or enter the scores by hand."
             ]
         }
     }
-
-    const attempts = (existing?.attempts ?? 0) + 1
-    await upsertRead(opts.scoreSheetId, {
-        status: "processing",
-        attempts,
-        started_at: new Date(),
-        error: null
-    })
+    const { attempts } = claimed
 
     try {
         const bytes = await readImageBytes(sheet.image_path)
@@ -372,6 +389,68 @@ async function finish(
     return { status: outcome.status, read: null, problems: outcome.problems }
 }
 
+/**
+ * A read that is still marked processing after this long was a function that
+ * died (maxDuration is 300s), not one that is still running.
+ */
+const STALE_PROCESSING = sql`interval '10 minutes'`
+
+type Claim =
+    | { kind: "claimed"; attempts: number }
+    | { kind: "busy" }
+    | { kind: "exhausted"; status: StoredReadStatus }
+
+/**
+ * Take the next attempt in one statement. Every attempt costs two model
+ * calls, so the counter has to be read and advanced together: N requests
+ * arriving at once must share the three attempts, not get three each.
+ */
+async function claimAttempt(scoreSheetId: number): Promise<Claim> {
+    await db
+        .insert(scoreSheetReads)
+        .values({ score_sheet_id: scoreSheetId, status: "pending" })
+        .onConflictDoNothing({ target: scoreSheetReads.score_sheet_id })
+
+    const [row] = await db
+        .update(scoreSheetReads)
+        .set({
+            status: "processing",
+            attempts: sql`${scoreSheetReads.attempts} + 1`,
+            started_at: new Date(),
+            error: null
+        })
+        .where(
+            and(
+                eq(scoreSheetReads.score_sheet_id, scoreSheetId),
+                lt(scoreSheetReads.attempts, MAX_ATTEMPTS),
+                or(
+                    ne(scoreSheetReads.status, "processing"),
+                    isNull(scoreSheetReads.started_at),
+                    lt(
+                        scoreSheetReads.started_at,
+                        sql`now() - ${STALE_PROCESSING}`
+                    )
+                )
+            )
+        )
+        .returning({ attempts: scoreSheetReads.attempts })
+    if (row) return { kind: "claimed", attempts: row.attempts }
+
+    const [current] = await db
+        .select({
+            status: scoreSheetReads.status,
+            attempts: scoreSheetReads.attempts
+        })
+        .from(scoreSheetReads)
+        .where(eq(scoreSheetReads.score_sheet_id, scoreSheetId))
+        .limit(1)
+    if (current && current.attempts < MAX_ATTEMPTS) return { kind: "busy" }
+    return {
+        kind: "exhausted",
+        status: (current?.status ?? "failed") as StoredReadStatus
+    }
+}
+
 type ReadUpdate = Partial<typeof scoreSheetReads.$inferInsert>
 
 /** Returns the read row's id, which the sample corpus is keyed on. */
@@ -392,14 +471,4 @@ async function upsertRead(
         })
         .returning({ id: scoreSheetReads.id })
     return row?.id ?? null
-}
-
-/** The stored read for an upload, for the review UI. */
-export async function getScoreSheetRead(scoreSheetId: number) {
-    const [row] = await db
-        .select()
-        .from(scoreSheetReads)
-        .where(eq(scoreSheetReads.score_sheet_id, scoreSheetId))
-        .limit(1)
-    return row ?? null
 }

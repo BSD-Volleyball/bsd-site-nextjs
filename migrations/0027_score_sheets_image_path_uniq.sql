@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "score_sheets_image_path_uniq" ON "score_sheets" USING btree ("image_path");

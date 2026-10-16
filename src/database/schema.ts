@@ -1470,7 +1470,14 @@ export const scoreSheets = pgTable(
     (table) => ({
         scoreSheetsSeasonDivDateIdx: index(
             "score_sheets_season_div_date_idx"
-        ).on(table.season_id, table.division_id, table.match_date)
+        ).on(table.season_id, table.division_id, table.match_date),
+        /**
+         * One row per photo: every read costs two model calls, so re-filing
+         * the same object must not buy another set of attempts.
+         */
+        scoreSheetsImagePathUniq: uniqueIndex(
+            "score_sheets_image_path_uniq"
+        ).on(table.image_path)
     })
 )
 
