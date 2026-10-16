@@ -75,6 +75,8 @@ export interface ScoreSheetData {
      * carries two divisions, so a single division id cannot describe it.
      */
     divisionId: number | null
+    /** The court its tag named, for a sheet uploaded in bulk; null until read. */
+    court: number | null
     imagePath: string
 }
 
@@ -343,6 +345,7 @@ export const getMatchesForDate = withAction(
                 .select({
                     id: scoreSheets.id,
                     divisionId: scoreSheets.division_id,
+                    court: scoreSheets.court,
                     imagePath: scoreSheets.image_path
                 })
                 .from(scoreSheets)
@@ -352,10 +355,12 @@ export const getMatchesForDate = withAction(
                         eq(scoreSheets.match_date, date)
                     )
                 )
+                .orderBy(asc(scoreSheets.uploaded_at))
 
             const scoreSheetData: ScoreSheetData[] = sheetRows.map((s) => ({
                 id: s.id,
                 divisionId: s.divisionId,
+                court: s.court,
                 imagePath: s.imagePath
             }))
 
@@ -994,6 +999,7 @@ export const finalizeScoreSheetUpload = withAction(
                 .returning({
                     id: scoreSheets.id,
                     divisionId: scoreSheets.division_id,
+                    court: scoreSheets.court,
                     imagePath: scoreSheets.image_path
                 })
 
@@ -1010,6 +1016,7 @@ export const finalizeScoreSheetUpload = withAction(
                 {
                     id: inserted.id,
                     divisionId: inserted.divisionId,
+                    court: inserted.court,
                     imagePath: inserted.imagePath
                 },
                 "Score sheet uploaded."

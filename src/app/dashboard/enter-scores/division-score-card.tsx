@@ -10,6 +10,7 @@ import type {
 import type { MatchFormState } from "./match-form-state"
 import { emptyResolved, type ResolvedMatchInfo } from "./match-resolution"
 import { MatchScoreEntry } from "./match-score-entry"
+import { sheetsForDivision } from "./sheet-filter"
 
 interface DivisionScoreCardProps {
     division: DivisionMatchGroup
@@ -52,9 +53,7 @@ export function DivisionScoreCard({
     setViewingImage,
     getImageUrl
 }: DivisionScoreCardProps) {
-    const divSheets = scoreSheetsList.filter(
-        (s) => s.divisionId === division.divisionId
-    )
+    const divSheets = sheetsForDivision(scoreSheetsList, division)
     const isDivUploading = uploadingDivision === division.divisionId
     const isDivSaving = savingDivision === division.divisionId
 
