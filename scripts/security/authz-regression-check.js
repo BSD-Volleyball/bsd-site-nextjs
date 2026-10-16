@@ -61,7 +61,8 @@ const strictExpectations = [
     },
     {
         key: "src/app/dashboard/enter-scores/actions.ts:saveScoresForDivision",
-        pattern: /hasPermissionBySession\s*\(\s*"scores:enter"\s*,\s*\{[^}]*divisionId/,
+        pattern:
+            /hasPermissionBySession\s*\(\s*"scores:enter"\s*,\s*\{[^}]*divisionId/,
         description:
             "must check scores:enter with the division in the context, so a division-scoped commissioner cannot save another division"
     },
