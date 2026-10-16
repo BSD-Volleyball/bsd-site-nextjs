@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { auditLog, seasonRefs, userRoles } from "@/database/schema"
+import { sessions, auditLog, seasonRefs, userRoles } from "@/database/schema"
 import { createDivision, createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import {
@@ -165,8 +165,21 @@ describe("removeSeasonRef", () => {
             .from(seasonRefs)
             .where(eq(seasonRefs.user_id, target.id))
         expect(await refereeRoleRows(target.id, season.id)).toHaveLength(1)
+        await db.insert(sessions).values({
+            id: crypto.randomUUID(),
+            token: crypto.randomUUID(),
+            userId: target.id,
+            expiresAt: new Date(Date.now() + 60_000)
+        })
 
         const result = await removeSeasonRef(row.id)
+        // The sessions opened with the role end with it
+        expect(
+            await db
+                .select()
+                .from(sessions)
+                .where(eq(sessions.userId, target.id))
+        ).toHaveLength(0)
 
         expect(result.status).toBe(true)
         expect(await db.select().from(seasonRefs)).toHaveLength(0)

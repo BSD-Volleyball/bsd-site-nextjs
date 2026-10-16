@@ -422,15 +422,18 @@ export const saveScoresForDivision = withAction(
         matchScores: MatchScoreInput[]
     ): Promise<ActionResult> => {
         const seasonId = await getEnterScoresSeasonId()
-        const hasAccess = seasonId
-            ? await hasPermissionBySession("scores:enter", { seasonId })
-            : false
-        if (!hasAccess || !seasonId) {
+        if (!seasonId || !divisionId || divisionId <= 0) {
             return fail("Unauthorized")
         }
-
-        if (!divisionId || divisionId <= 0) {
-            return fail("Invalid division.")
+        // With the division in the context, a commissioner scoped to one
+        // division passes only for that one; referees and admins hold
+        // league-wide rows and pass for any.
+        const hasAccess = await hasPermissionBySession("scores:enter", {
+            seasonId,
+            divisionId
+        })
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
         try {

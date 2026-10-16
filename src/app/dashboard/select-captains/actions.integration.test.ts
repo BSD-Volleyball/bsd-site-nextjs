@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { auditLog, teams, userRoles } from "@/database/schema"
+import { auditLog, sessions, teams, userRoles } from "@/database/schema"
 import { createDivision, createSeason, createSignup } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { createTeams } from "./actions"
@@ -167,6 +167,12 @@ describe("createTeams", () => {
 
         const replacement = await createUser()
         await createSignup({ season: season.id, player: replacement.id })
+        await db.insert(sessions).values({
+            id: crypto.randomUUID(),
+            token: crypto.randomUUID(),
+            userId: captains[0].id,
+            expiresAt: new Date(Date.now() + 60_000)
+        })
         const payload = teamsPayload([replacement, ...captains.slice(1)])
         const result = await createTeams(division.id, payload)
 
@@ -187,6 +193,13 @@ describe("createTeams", () => {
         expect(await captainRoleRows(captains[0].id)).toHaveLength(0)
         expect(await captainRoleRows(replacement.id)).toHaveLength(1)
         expect(await captainRoleRows(captains[1].id)).toHaveLength(1)
+        // The replaced captain's sessions end with the role
+        expect(
+            await db
+                .select()
+                .from(sessions)
+                .where(eq(sessions.userId, captains[0].id))
+        ).toHaveLength(0)
     })
 
     it("rejects unknown captain ids before writing anything", async () => {

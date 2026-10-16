@@ -9,6 +9,7 @@ import { userRoles } from "@/database/schema"
 import { eq, and, isNotNull } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
+import { invalidateAllSessionsForUser } from "@/lib/rbac"
 import { getDivisions } from "./data"
 
 export interface CommissionerAssignment {
@@ -99,6 +100,17 @@ export const saveCommissioners = withAction(
         requirePositiveInt(data.seasonId, "season ID")
 
         try {
+            const scopedRows = and(
+                eq(userRoles.role, "commissioner"),
+                eq(userRoles.season_id, data.seasonId),
+                isNotNull(userRoles.division_id)
+            )
+            const before = await db
+                .select({ userId: userRoles.user_id })
+                .from(userRoles)
+                .where(scopedRows)
+            const previousHolders = new Set(before.map((r) => r.userId))
+
             // Replace this season's division-scoped commissioner roles.
             // League-wide commissioner rows (division_id IS NULL) are managed via
             // /dashboard/manage-roles and deliberately left untouched here.
@@ -142,14 +154,34 @@ export const saveCommissioners = withAction(
                 await db.insert(userRoles).values(userRoleValues)
             }
 
-            // Log the action
+            // Anyone who lost the role should not keep a session that was
+            // opened with it (permission checks read user_roles live, so
+            // this closes the cookie-cache window rather than a real hole).
+            const currentHolders = new Set(userRoleValues.map((r) => r.user_id))
+            const removed = [...previousHolders].filter(
+                (id) => !currentHolders.has(id)
+            )
+            const added = [...currentHolders].filter(
+                (id) => !previousHolders.has(id)
+            )
+            for (const userId of removed) {
+                await invalidateAllSessionsForUser(userId)
+            }
+
+            // Log the action, naming who gained and lost the role
             const sessionUserId = await getSessionUserId()
             if (sessionUserId) {
+                const detail = [
+                    added.length ? `added ${added.join(", ")}` : null,
+                    removed.length ? `removed ${removed.join(", ")}` : null
+                ]
+                    .filter(Boolean)
+                    .join("; ")
                 await logAuditEntry({
                     userId: sessionUserId,
                     action: "update",
                     entityType: "commissioners",
-                    summary: `Updated commissioners for season ${data.seasonId}`
+                    summary: `Updated commissioners for season ${data.seasonId}${detail ? ` (${detail})` : ""}`
                 })
             }
 

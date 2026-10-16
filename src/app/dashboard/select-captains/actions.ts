@@ -18,7 +18,12 @@ import { logAuditEntry } from "@/lib/audit-log"
 
 import { getSeasonConfig } from "@/lib/site-config"
 import { getSessionUserId, isCommissionerBySession } from "@/next/session"
-import { commissionerCanWriteDivision, grantRole, revokeRole } from "@/lib/rbac"
+import {
+    commissionerCanWriteDivision,
+    grantRole,
+    invalidateAllSessionsForUser,
+    revokeRole
+} from "@/lib/rbac"
 import { GHOST_CAPTAIN_ID, isGhostCaptain } from "@/lib/ghost-captain"
 
 interface TeamToCreate {
@@ -297,21 +302,37 @@ export const createTeams = withAction(
                 }
             }
 
+            const removedCaptains: string[] = []
             for (const captainId of oldCaptainIds) {
                 if (!newCaptainIds.has(captainId)) {
                     await revokeRole(captainId, "captain", {
                         seasonId: config.seasonId,
                         divisionId
                     })
+                    await invalidateAllSessionsForUser(captainId)
+                    removedCaptains.push(captainId)
                 }
             }
+            const addedCaptains = [...newCaptainIds].filter(
+                (id) => !oldCaptainIds.has(id)
+            )
 
             const isUpdate = existingTeams.length > 0
+            const roleDetail = [
+                addedCaptains.length
+                    ? `captains added ${addedCaptains.join(", ")}`
+                    : null,
+                removedCaptains.length
+                    ? `captains removed ${removedCaptains.join(", ")}`
+                    : null
+            ]
+                .filter(Boolean)
+                .join("; ")
             await logAuditEntry({
                 userId: callerId,
                 action: isUpdate ? "update" : "create",
                 entityType: "teams",
-                summary: `${isUpdate ? "Updated" : "Created"} teams for current season ${config.seasonId}, division ${divisionId}${isCoachesDiv ? " (coaches mode)" : ""}`
+                summary: `${isUpdate ? "Updated" : "Created"} teams for current season ${config.seasonId}, division ${divisionId}${isCoachesDiv ? " (coaches mode)" : ""}${roleDetail ? ` (${roleDetail})` : ""}`
             })
 
             revalidatePath("/dashboard/select-captains")

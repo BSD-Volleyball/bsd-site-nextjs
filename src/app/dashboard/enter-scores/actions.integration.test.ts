@@ -103,6 +103,39 @@ describe("saveScoresForDivision", () => {
         expect(result).toEqual({ status: false, message: "Unauthorized" })
     })
 
+    it("holds a commissioner to their division", async () => {
+        const otherDivision = await createDivision({ name: "BB", level: 6 })
+        await createUserWithRoles([
+            {
+                role: "commissioner",
+                seasonId: fixture.seasonId,
+                divisionId: otherDivision.id
+            }
+        ])
+        const result = await saveScoresForDivision(
+            fixture.divisionId,
+            MATCH_DATE,
+            [scoreInput()]
+        )
+        expect(result).toEqual({ status: false, message: "Unauthorized" })
+    })
+
+    it("lets a commissioner save their own division", async () => {
+        await createUserWithRoles([
+            {
+                role: "commissioner",
+                seasonId: fixture.seasonId,
+                divisionId: fixture.divisionId
+            }
+        ])
+        const result = await saveScoresForDivision(
+            fixture.divisionId,
+            MATCH_DATE,
+            [scoreInput()]
+        )
+        expect(result.status).toBe(true)
+    })
+
     it("persists set scores and the winner for a season-scoped referee", async () => {
         await createUserWithRoles([
             { role: "referee", seasonId: fixture.seasonId }

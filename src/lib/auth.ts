@@ -158,7 +158,10 @@ export const auth = betterAuth({
             onboarding_completed: {
                 type: "boolean",
                 required: false,
-                fieldName: "onboarding_completed"
+                fieldName: "onboarding_completed",
+                // Set by the onboarding actions once the profile is complete,
+                // never by the sign-up or update-user request body.
+                input: false
             }
         }
     },

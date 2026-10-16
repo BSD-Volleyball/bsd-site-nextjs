@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, isNull } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { auditLog, userRoles } from "@/database/schema"
+import { auditLog, sessions, userRoles } from "@/database/schema"
 import { createDivision, createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { getCommissionersForSeason, saveCommissioners } from "./actions"
@@ -132,6 +132,52 @@ describe("saveCommissioners", () => {
         expect(audit).toHaveLength(1)
         expect(audit[0].action).toBe("update")
         expect(audit[0].entity_type).toBe("commissioners")
+    })
+
+    it("ends the sessions of whoever lost the role, and names the change", async () => {
+        const season = await createSeason()
+        const division = await createDivision()
+        const outgoing = await createUser()
+        const incoming = await createUser()
+        await db.insert(userRoles).values({
+            user_id: outgoing.id,
+            role: "commissioner",
+            season_id: season.id,
+            division_id: division.id
+        })
+        await db.insert(sessions).values({
+            id: crypto.randomUUID(),
+            token: crypto.randomUUID(),
+            userId: outgoing.id,
+            expiresAt: new Date(Date.now() + 60_000)
+        })
+        const admin = await createUserWithRoles([{ role: "admin" }])
+
+        const result = await saveCommissioners({
+            seasonId: season.id,
+            assignments: [
+                {
+                    divisionId: division.id,
+                    divisionName: division.name,
+                    commissioner1: incoming.id,
+                    commissioner2: null
+                }
+            ]
+        })
+        expect(result.status).toBe(true)
+
+        expect(
+            await db
+                .select()
+                .from(sessions)
+                .where(eq(sessions.userId, outgoing.id))
+        ).toHaveLength(0)
+        const [audit] = await db
+            .select({ summary: auditLog.summary })
+            .from(auditLog)
+            .where(eq(auditLog.user, admin.id))
+        expect(audit.summary).toContain(`added ${incoming.id}`)
+        expect(audit.summary).toContain(`removed ${outgoing.id}`)
     })
 
     it("clears all division-scoped rows when every slot is empty", async () => {

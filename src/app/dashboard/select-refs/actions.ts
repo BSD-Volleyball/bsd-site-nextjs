@@ -16,7 +16,7 @@ import {
     ActionError
 } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
-import { grantRole, revokeRole } from "@/lib/rbac"
+import { grantRole, invalidateAllSessionsForUser, revokeRole } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 
 // ---------------------------------------------------------------------------
@@ -430,10 +430,11 @@ export const removeSeasonRef = withAction(
 
         await db.delete(seasonRefs).where(eq(seasonRefs.id, id))
 
-        // Revoke referee role for this season
+        // Revoke referee role for this season, and the sessions opened with it
         await revokeRole(refRecord.userId, "referee", {
             seasonId: refRecord.seasonId
         })
+        await invalidateAllSessionsForUser(refRecord.userId)
 
         await logAuditEntry({
             userId: session.user.id,
