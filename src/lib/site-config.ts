@@ -136,11 +136,23 @@ export function isLatePricing(config: SeasonConfig): boolean {
     return false
 }
 
+export type SignupEligibility =
+    | "eligible"
+    | "already_signed_up"
+    | "closed"
+    | "full"
+
 export async function checkSignupEligibility(userId: string): Promise<boolean> {
+    return (await getSignupEligibility(userId)) === "eligible"
+}
+
+export async function getSignupEligibility(
+    userId: string
+): Promise<SignupEligibility> {
     const config = await getSeasonConfig()
 
     if (!config.seasonId || config.phase === "complete") {
-        return false
+        return "closed"
     }
 
     const [existingSignup] = await db
@@ -152,15 +164,17 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
         .limit(1)
 
     if (existingSignup) {
-        return false
+        return "already_signed_up"
     }
 
     // Once registration closes, the only way in is an admin approving the
     // player off the waitlist (e.g. a drop-out during tryouts or the draft).
     // The pay-season action already honors that approval; this keeps the
-    // sidebar link and dashboard CTA in step with it.
+    // sidebar link, dashboard CTA and sign-up page in step with it.
     if (!isSeasonRegistrationOpen(config.phase)) {
-        return isApprovedWaitlister(config.seasonId, userId)
+        return (await isApprovedWaitlister(config.seasonId, userId))
+            ? "eligible"
+            : "closed"
     }
 
     const maxPlayers = config.maxPlayers
@@ -171,11 +185,13 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
             .where(eq(signups.season, config.seasonId))
 
         if (result && result.total >= maxPlayers) {
-            return isApprovedWaitlister(config.seasonId, userId)
+            return (await isApprovedWaitlister(config.seasonId, userId))
+                ? "eligible"
+                : "full"
         }
     }
 
-    return true
+    return "eligible"
 }
 
 async function isApprovedWaitlister(

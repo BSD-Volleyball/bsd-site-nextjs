@@ -5,13 +5,15 @@ import { listUserNames } from "@/lib/user-directory"
 import {
     getSeasonConfig,
     getCurrentSeasonAmount,
-    formatSeasonLabel
+    formatSeasonLabel,
+    getSignupEligibility
 } from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { getActiveWaiver } from "@/lib/waivers"
 import { db } from "@/database/db"
 import { signups } from "@/database/schema"
@@ -79,6 +81,17 @@ export default async function PaySeasonPage() {
         existingSignup = row ?? null
     }
 
+    // The sidebar link and dashboard CTAs hide once a player can't sign up,
+    // but the URL still works (bookmarks, last season's history). Without
+    // this the wizard takes a card and only the payment action refuses it.
+    // A player who has signed up skips this so the wizard can keep showing
+    // the success card it puts up after payment.
+    const eligibility =
+        session && !existingSignup
+            ? await getSignupEligibility(session.user.id)
+            : "eligible"
+    const blocked = eligibility === "closed" || eligibility === "full"
+
     return (
         <div className="space-y-6">
             <div>
@@ -95,17 +108,34 @@ export default async function PaySeasonPage() {
                     </Link>
                 </Button>
             </div>
-            <WizardForm
-                amount={getCurrentSeasonAmount(config)}
-                users={users}
-                config={config}
-                discount={discount}
-                activeWaiver={activeWaiver}
-                week1Audience={week1Audience}
-                isKnownAdult={isKnownAdult}
-                seasonLabel={seasonLabel}
-                existingSignup={existingSignup}
-            />
+            {blocked ? (
+                <StatusBanner variant="warning" className="space-y-2 p-6">
+                    <h2 className="font-semibold text-lg">
+                        {eligibility === "full"
+                            ? `The ${seasonLabel || "current"} season is full`
+                            : `Registration for the ${seasonLabel || "current"} season is closed`}
+                    </h2>
+                    <p className="text-sm">
+                        Want to play or sub? Join the waitlist from your
+                        dashboard and we'll reach out if a spot opens up.
+                    </p>
+                    <Button asChild size="sm" className="mt-1">
+                        <Link href="/dashboard">Go to Dashboard</Link>
+                    </Button>
+                </StatusBanner>
+            ) : (
+                <WizardForm
+                    amount={getCurrentSeasonAmount(config)}
+                    users={users}
+                    config={config}
+                    discount={discount}
+                    activeWaiver={activeWaiver}
+                    week1Audience={week1Audience}
+                    isKnownAdult={isKnownAdult}
+                    seasonLabel={seasonLabel}
+                    existingSignup={existingSignup}
+                />
+            )}
         </div>
     )
 }
