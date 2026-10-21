@@ -565,6 +565,17 @@ export const captainPagesNavItems: NavItem[] = [
     }
 ]
 
+/**
+ * This season's draft results, for the divisions the viewer captains,
+ * coaches or commissions (all divisions for admins). Kept out of
+ * captainPagesNavItems because sidebar-sections.ts slices that by index.
+ */
+export const draftBoardNavItem: NavItem = {
+    title: "Draft Board",
+    url: "/dashboard/draft-board",
+    icon: RiFileList3Line
+}
+
 export const seasonCategories = [
     { key: "rosters", label: "Rosters", basePath: "/dashboard/rosters" },
     { key: "schedule", label: "Season", basePath: "/dashboard/schedule" },

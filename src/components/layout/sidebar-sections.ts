@@ -19,6 +19,7 @@ import {
     commissionerNavItems,
     concernsNavItems,
     currentRostersNavItem,
+    draftBoardNavItem,
     enterScoresNavItem,
     manageRefsNavItems,
     myAvailabilityNavItem,
@@ -79,6 +80,7 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
         isCommissioner,
         hasCaptainPagesAccess,
         isCoach,
+        hasDraftBoardAccess,
         hasPicturesAccess,
         hasScoresAccess,
         hasConcernsAccess,
@@ -166,6 +168,9 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
     const showTeamAvailability =
         (hasCaptainPagesAccess && inRange("prep_tryout_week_2", "playoffs")) ||
         isCoach
+    // Draft Board: this season's draft results, from the draft until the
+    // next season starts. Admins, captains, coaches and commissioners.
+    const showDraftBoard = hasDraftBoardAccess && inRange("draft", "complete")
     const visibleCaptainItems = [
         ...(showTeamAvailability ? [captainPagesNavItems[0]] : []),
         ...(captainViewSignupsVisible ? [captainPagesNavItems[1]] : []),
@@ -179,7 +184,8 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
             : []),
         ...(hasCaptainPagesAccess && showDraftItems
             ? captainPagesNavItems.slice(5)
-            : [])
+            : []),
+        ...(showDraftBoard ? [draftBoardNavItem] : [])
     ]
 
     // Commissioner section — per-item filtering
@@ -495,6 +501,7 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
         // Base items hidden if the whole captain section is suppressed
         return !captainBaseVisible
     })
+    if (!showDraftBoard) hiddenCaptainItems.push(draftBoardNavItem)
     if (hiddenCaptainItems.length > 0)
         hiddenGroups.push({
             label: "Captain Pages",

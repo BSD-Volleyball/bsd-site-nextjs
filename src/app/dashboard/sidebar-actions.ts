@@ -8,6 +8,7 @@ import { logger } from "@/lib/logger"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { hasStaffAvailabilityAccess } from "@/lib/availability"
+import { getDraftBoardDivisions } from "@/lib/draft-results"
 import { checkSignupEligibility } from "@/lib/site-config"
 import { db } from "@/database/db"
 import {
@@ -30,7 +31,7 @@ import {
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
 } from "@/next/session"
-import type { SeasonPhase } from "@/lib/season-phases"
+import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
 
 interface SeasonNavDivision {
     id: number
@@ -224,6 +225,8 @@ export interface SidebarData {
     isCommissioner: boolean
     hasCaptainPagesAccess: boolean
     isCoach: boolean
+    /** Admin, or captain/coach/commissioner of a division this season. */
+    hasDraftBoardAccess: boolean
     hasPicturesAccess: boolean
     hasScoresAccess: boolean
     hasConcernsAccess: boolean
@@ -248,6 +251,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
             isCommissioner: false,
             hasCaptainPagesAccess: false,
             isCoach: false,
+            hasDraftBoardAccess: false,
             hasPicturesAccess: false,
             hasScoresAccess: false,
             hasConcernsAccess: false,
@@ -277,7 +281,8 @@ export async function loadSidebarData(): Promise<SidebarData> {
         historicalNav,
         isCoach,
         hasSurveys,
-        hasStaffAvailability
+        hasStaffAvailability,
+        hasDraftBoardAccess
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
         seasonId
@@ -369,6 +374,13 @@ export async function loadSidebarData(): Promise<SidebarData> {
         })(),
         seasonId
             ? hasStaffAvailabilityAccess(session.user.id, seasonId)
+            : Promise.resolve(false),
+        // The link only shows from the draft on, so skip the lookup before.
+        seasonId &&
+        SEASON_PHASES.indexOf(config.phase) >= SEASON_PHASES.indexOf("draft")
+            ? getDraftBoardDivisions(session.user.id, seasonId).then(
+                  (divisions) => divisions.length > 0
+              )
             : Promise.resolve(false)
     ])
 
@@ -382,6 +394,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
         isCommissioner,
         hasCaptainPagesAccess,
         isCoach,
+        hasDraftBoardAccess,
         hasPicturesAccess,
         hasScoresAccess,
         hasConcernsAccess,

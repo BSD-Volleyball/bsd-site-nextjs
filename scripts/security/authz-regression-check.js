@@ -67,6 +67,12 @@ const strictExpectations = [
             "must check scores:enter with the division in the context, so a division-scoped commissioner cannot save another division"
     },
     {
+        key: "src/app/dashboard/draft-board/actions.ts:getDraftBoard",
+        pattern: /getDraftBoardDivisions\s*\([\s\S]*?\.some\s*\(/,
+        description:
+            "must check the division against getDraftBoardDivisions, so a captain or commissioner cannot read another division's draft"
+    },
+    {
         key: "src/app/dashboard/rosters/[seasonId]/data.ts:getRosterData",
         pattern: /requireSession\s*\(/,
         description: "must require an authenticated session via requireSession"
