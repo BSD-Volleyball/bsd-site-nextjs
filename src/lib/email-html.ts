@@ -408,26 +408,57 @@ export function buildFriendAcceptedHtml(opts: {
     })
 }
 
+/** One match a reminder covers: one the recipient plays, works or referees. */
+export interface GameReminderItem {
+    role: "play" | "work"
+    timeLabel: string
+    courtLabel: string
+    matchupLabel: string
+    /** Playoff bracket match number; null outside the bracket. */
+    matchNum: number | null
+    /** e.g. "If you win match 1"; null when the match is certain. */
+    condition: string | null
+}
+
+function renderGameReminderItem(
+    item: GameReminderItem,
+    dateLabel: string | null
+): string {
+    const condition = item.condition
+        ? `<div style="font-style:italic;color:#6b7280;padding-bottom:4px;">${escapeHtml(item.condition)}:</div>`
+        : ""
+    const rows = [
+        dateLabel ? renderDetailRow("Date:", dateLabel) : "",
+        item.matchNum !== null
+            ? renderDetailRow(
+                  item.role === "play" ? "Play:" : "Work:",
+                  `Match #${item.matchNum}`
+              )
+            : "",
+        renderDetailRow("Time:", item.timeLabel),
+        renderDetailRow("Court:", item.courtLabel),
+        renderDetailRow("Matchup:", item.matchupLabel)
+    ].filter(Boolean)
+    return renderDetailsBlock([condition, ...rows])
+}
+
 export function buildGameReminderHtml(opts: {
     firstName: string
     role: "player" | "referee"
     dateLabel: string
-    timeLabel: string
-    courtLabel: string
-    matchupLabel: string
     teamName: string | null
+    items: GameReminderItem[]
 }): string {
+    const team = opts.teamName ? ` (${escapeHtml(opts.teamName)})` : ""
+    const single = opts.items.length === 1
     const intro =
         opts.role === "referee"
             ? "You're scheduled to referee a match tomorrow:"
-            : `Your team${opts.teamName ? ` (${escapeHtml(opts.teamName)})` : ""} has a match tomorrow:`
-
-    const detailRows = [
-        renderDetailRow("Date:", opts.dateLabel),
-        renderDetailRow("Time:", opts.timeLabel),
-        renderDetailRow("Court:", opts.courtLabel),
-        renderDetailRow("Matchup:", opts.matchupLabel)
-    ]
+            : single
+              ? `Your team${team} has a match tomorrow:`
+              : `Here's everything your team${team} has on tomorrow, ${escapeHtml(opts.dateLabel)}:`
+    const conditional = opts.items.some((item) => item.condition)
+    const isPlayoff = opts.items.some((item) => item.matchNum !== null)
 
     return renderEmailHtml({
         heading:
@@ -435,11 +466,18 @@ export function buildGameReminderHtml(opts: {
         bodyHtml: `
             <p>Hi ${escapeHtml(opts.firstName)},</p>
             <p>${intro}</p>
-            ${renderDetailsBlock(detailRows)}
+            ${opts.items
+                .map((item) =>
+                    renderGameReminderItem(item, single ? opts.dateLabel : null)
+                )
+                .join("")}
+            ${conditional ? "<p>The matches marked “If you…” depend on results earlier in the night.</p>" : ""}
             <p style="font-size:12px;color:#9ca3af;">Don't want these reminders? <a href="${escapeHtml(site.publicUrl)}/dashboard/notifications" style="color:#9ca3af;">Manage your email preferences</a>.</p>
         `,
-        action: "View Schedule",
-        actionUrl: `${site.url}/dashboard/season-schedule`
+        action: isPlayoff ? "View Playoff Bracket" : "View Schedule",
+        actionUrl: isPlayoff
+            ? `${site.url}/dashboard/season-playoffs`
+            : `${site.url}/dashboard/season-schedule`
     })
 }
 

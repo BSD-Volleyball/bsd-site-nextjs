@@ -211,3 +211,47 @@ export function resolveOpponentLabel(
 
     return source.normalized || source.raw || "TBD"
 }
+
+export interface TeamNodeItem {
+    role: "play" | "work"
+    // null when the team is certain to be there; otherwise the outcome chain
+    // required, e.g. "If you win match 1".
+    condition: string | null
+    // Play rows only: the other side, e.g. "#2 Spikers" or "Winner of #3".
+    opponentLabel: string | null
+}
+
+// What a team could be doing in one bracket match: a play row if either side
+// can resolve to it, and a work row if the work source can. Both appear for a
+// match the team plays if it wins one earlier match and works if it loses.
+export function teamItemsForNode(
+    node: PlayoffNode,
+    teamId: number,
+    ctx: ResolutionContext,
+    teamLabelById: Map<number, string>
+): TeamNodeItem[] {
+    const items: TeamNodeItem[] = []
+    const playHome = sourceContainsTeam(node.homeSource, teamId, ctx)
+    const playAway = sourceContainsTeam(node.awaySource, teamId, ctx)
+    if (playHome.contains || playAway.contains) {
+        const side = playHome.contains ? playHome : playAway
+        items.push({
+            role: "play",
+            condition: side.condition,
+            opponentLabel: resolveOpponentLabel(
+                playHome.contains ? node.awaySource : node.homeSource,
+                ctx,
+                teamLabelById
+            )
+        })
+    }
+    const work = sourceContainsTeam(node.workSource, teamId, ctx)
+    if (work.contains) {
+        items.push({
+            role: "work",
+            condition: work.condition,
+            opponentLabel: null
+        })
+    }
+    return items
+}

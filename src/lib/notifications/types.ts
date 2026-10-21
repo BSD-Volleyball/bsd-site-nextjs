@@ -79,7 +79,7 @@ export const NOTIFICATION_CATEGORIES: Record<
     game_reminders: {
         label: "Game reminders",
         description:
-            "A reminder email the day before matches you play or referee."
+            "A reminder email the day before matches you play, work or referee."
     },
     captain: {
         label: "Captain notifications",

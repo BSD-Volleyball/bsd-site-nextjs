@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { eq } from "drizzle-orm"
 import { db } from "@/database/db"
-import { drafts, matchReferees, notificationOptouts } from "@/database/schema"
+import {
+    drafts,
+    matchReferees,
+    matches,
+    notificationOptouts,
+    playoffMatchesMeta
+} from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
     createDivision,
@@ -48,6 +55,85 @@ async function seedMatchDay() {
         away_team: awayTeam.id
     })
     return { season, match, homePlayer, awayPlayer, homeTeam, awayTeam }
+}
+
+/**
+ * A playoff night shaped like the real bracket's opening: match 1 is seed 2
+ * vs seed 3, worked by seed 1; match 2 is seed 1 vs the winner of match 1,
+ * worked by its loser. Match 2's teams are unknown the day before.
+ */
+async function seedPlayoffNight() {
+    const season = await createSeason()
+    const division = await createDivision()
+    const seeds = []
+    for (const [rank, name] of [
+        [1, "Top Seeds"],
+        [2, "Middle Seeds"],
+        [3, "Low Seeds"]
+    ] as const) {
+        const captain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            division: division.id,
+            captain: captain.id,
+            name,
+            number: rank,
+            rank
+        })
+        const player = await createUser()
+        await db
+            .insert(drafts)
+            .values({ team: team.id, user: player.id, round: 1, overall: rank })
+        seeds.push({ team, player })
+    }
+    const [s1, s2, s3] = seeds
+    const m1 = await createMatch({
+        season: season.id,
+        division: division.id,
+        playoff: true,
+        date: TARGET_DATE,
+        time: "19:00:00",
+        court: 2,
+        home_team: s2.team.id,
+        away_team: s3.team.id
+    })
+    const m2 = await createMatch({
+        season: season.id,
+        division: division.id,
+        playoff: true,
+        date: TARGET_DATE,
+        time: "19:50:00",
+        court: 2
+    })
+    await db.insert(playoffMatchesMeta).values([
+        {
+            season: season.id,
+            division: division.id,
+            week: 1,
+            match_num: 1,
+            match_id: m1.id,
+            home_source: "S2",
+            away_source: "S3",
+            work_source: "S1"
+        },
+        {
+            season: season.id,
+            division: division.id,
+            week: 1,
+            match_num: 2,
+            match_id: m2.id,
+            home_source: "S1",
+            away_source: "W1",
+            work_source: "L1"
+        }
+    ])
+    return { season, m2, s1, s2, s3 }
+}
+
+function messagesTo(email: string) {
+    return mockedSendBatch.mock.calls
+        .flatMap((call) => call[0])
+        .filter((m) => m.to === email)
 }
 
 describe("sendGameRemindersForDate", () => {
@@ -116,5 +202,60 @@ describe("sendGameRemindersForDate", () => {
             call[0].map((m) => m.to)
         )
         expect(sentTo).toEqual([awayPlayer.email])
+    })
+
+    it("sends each player one email covering every playoff match they may play or work", async () => {
+        const { season, m2, s1, s2, s3 } = await seedPlayoffNight()
+        const referee = await createUser()
+        await db.insert(matchReferees).values({
+            match_id: m2.id,
+            referee_id: referee.id,
+            season_id: season.id,
+            role: "primary"
+        })
+
+        const result = await sendGameRemindersForDate(TARGET_DATE)
+        expect(result.matches).toBe(2)
+        expect(result.playersSent).toBe(3)
+        expect(result.refereesSent).toBe(1)
+        expect(result.failed).toBe(0)
+
+        // Seed 2 plays match 1, then plays or works match 2 on the result.
+        const [middle] = messagesTo(s2.player.email)
+        expect(messagesTo(s2.player.email)).toHaveLength(1)
+        expect(middle.subject).toContain("7:00")
+        expect(middle.htmlBody).toContain("Match #1")
+        expect(middle.htmlBody).toContain("If you win match 1")
+        expect(middle.htmlBody).toContain("If you lose match 1")
+        expect(middle.htmlBody).toContain("#1 Top Seeds")
+
+        // Seed 1 works match 1 and plays match 2 whatever happens.
+        const [top] = messagesTo(s1.player.email)
+        expect(top.htmlBody).toContain("Work:")
+        expect(top.htmlBody).toContain("Winner of #1")
+        expect(top.htmlBody).not.toContain("If you")
+
+        expect(messagesTo(s3.player.email)[0].htmlBody).toContain(
+            "If you win match 1"
+        )
+        // Match 2's teams are unknown, but its referee is still reminded.
+        expect(messagesTo(referee.email)[0].htmlBody).toContain(
+            "#1 Top Seeds vs Winner of #1"
+        )
+    })
+
+    it("leaves out a team already knocked out of the bracket", async () => {
+        const { s2, s3 } = await seedPlayoffNight()
+        // Match 1 already decided (seed 3 won): seed 2 only works match 2.
+        await db
+            .update(matches)
+            .set({ winner: s3.team.id, home_score: 0, away_score: 2 })
+            .where(eq(matches.home_team, s2.team.id))
+
+        await sendGameRemindersForDate(TARGET_DATE)
+        const [middle] = messagesTo(s2.player.email)
+        expect(middle.htmlBody).toContain("Work:")
+        expect(middle.htmlBody).not.toContain("Play:")
+        expect(middle.htmlBody).not.toContain("If you")
     })
 })
