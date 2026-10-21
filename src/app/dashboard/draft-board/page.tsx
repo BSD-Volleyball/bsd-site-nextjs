@@ -1,6 +1,8 @@
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
+import { RiLockLine } from "@remixicon/react"
 import { PageHeader } from "@/components/layout/page-header"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getDraftBoardDivisions } from "@/lib/draft-results"
 import { DraftBoardClient } from "./draft-board-client"
@@ -32,10 +34,31 @@ export default async function DraftBoardPage() {
                     coaches and commissioners.
                 </div>
             ) : (
-                <DraftBoardClient
-                    divisions={divisions}
-                    playerPicUrl={playerPicBaseUrl()}
-                />
+                <>
+                    <StatusBanner
+                        variant="warning"
+                        className="flex items-start gap-3 border-2"
+                    >
+                        <RiLockLine
+                            className="mt-0.5 size-6 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <div className="space-y-1">
+                            <p className="font-bold text-lg">
+                                What happens in the draft stays in the draft.
+                            </p>
+                            <p>
+                                These results are confidential. Do not share
+                                them, talk about them, or show them to anyone
+                                else.
+                            </p>
+                        </div>
+                    </StatusBanner>
+                    <DraftBoardClient
+                        divisions={divisions}
+                        playerPicUrl={playerPicBaseUrl()}
+                    />
+                </>
             )}
         </div>
     )
