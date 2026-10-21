@@ -10,7 +10,11 @@
  * dashboard's next-match card. Rosters honor permanent-sub chains via
  * getTeamRosterWithSubs. Each player email also shows the recipient's own
  * availability and who on their team is (and isn't) coming that night,
- * one-night subs included. Assigned referees get one email listing every
+ * one-night subs included. A one-night sub gets the same email for the team
+ * they cover: the matches they are booked on, and on a playoff night every
+ * bracket match that team has (a sub can only be booked on a match whose
+ * teams are set, so the conditional later ones never carry a sub row).
+ * Assigned referees get one email listing every
  * match they referee that night.
  *
  * Each dispatch carries a per-night dedupe key, so a re-fired cron — or
@@ -65,11 +69,14 @@ interface GameReminderRunResult {
 /** One thing a team (or referee) does tonight, before it is rendered. */
 interface TeamNightItem {
     role: "play" | "work" | "ref"
+    matchId: number
     time: string | null
     court: number | null
     matchupLabel: string
     matchNum: number | null
     condition: string | null
+    /** One-night subs only: "Casey Covered (Home Heroes)". */
+    subFor?: string
 }
 
 const homeTeams = aliasedTable(teams, "home_teams")
@@ -94,7 +101,8 @@ function toEmailItem(item: TeamNightItem): GameReminderItem {
         courtLabel: item.court != null ? `Court ${item.court}` : "TBD",
         matchupLabel: item.matchupLabel,
         matchNum: item.matchNum,
-        condition: item.condition
+        condition: item.condition,
+        subFor: item.subFor
     }
 }
 
@@ -199,6 +207,7 @@ export async function sendGameRemindersForDate(
                 )) {
                     addItem(teamId, {
                         role: item.role,
+                        matchId: slot.matchId,
                         time: slot.time,
                         court: slot.court,
                         matchupLabel:
@@ -229,6 +238,7 @@ export async function sendGameRemindersForDate(
             teamNameById.set(teamId, name)
             addItem(teamId, {
                 role: "play",
+                matchId: m.id,
                 time: m.time,
                 court: m.court,
                 matchupLabel,
@@ -289,6 +299,7 @@ export async function sendGameRemindersForDate(
             ),
         db
             .select({
+                matchId: matchSubstitutions.match,
                 teamId: matchSubstitutions.team,
                 originalUserId: matchSubstitutions.original_user,
                 subUserId: matchSubstitutions.sub_user
@@ -298,11 +309,46 @@ export async function sendGameRemindersForDate(
     ])
     const unavailableIds = new Set(unavailableRows.map((r) => r.userId))
 
-    const playerIds = [...teamIdsByUser.keys()]
+    // One-night subs, per sub: the teams they cover tonight and for whom.
+    const subbingByUser = new Map<
+        string,
+        Map<number, { forUserIds: string[]; matchIds: Set<number> }>
+    >()
+    for (const r of matchSubRows) {
+        if (!itemsByTeam.has(r.teamId)) continue
+        const byTeam = subbingByUser.get(r.subUserId) ?? new Map()
+        const entry = byTeam.get(r.teamId) ?? {
+            forUserIds: [],
+            matchIds: new Set<number>()
+        }
+        if (!entry.forUserIds.includes(r.originalUserId)) {
+            entry.forUserIds.push(r.originalUserId)
+        }
+        entry.matchIds.add(r.matchId)
+        byTeam.set(r.teamId, entry)
+        subbingByUser.set(r.subUserId, byTeam)
+    }
+    const subTeamIds = [
+        ...new Set([...subbingByUser.values()].flatMap((m) => [...m.keys()]))
+    ]
+    const captainByTeam = new Map(
+        (subTeamIds.length > 0
+            ? await db
+                  .select({ id: teams.id, captain: teams.captain })
+                  .from(teams)
+                  .where(inArray(teams.id, subTeamIds))
+            : []
+        ).map((t) => [t.id, t.captain])
+    )
+
+    const playerIds = [
+        ...new Set([...teamIdsByUser.keys(), ...subbingByUser.keys()])
+    ]
     const lookupIds = [
         ...new Set([
             ...playerIds,
-            ...matchSubRows.flatMap((r) => [r.originalUserId, r.subUserId])
+            ...matchSubRows.flatMap((r) => [r.originalUserId, r.subUserId]),
+            ...captainByTeam.values()
         ])
     ]
     const userById = new Map(
@@ -375,27 +421,55 @@ export async function sendGameRemindersForDate(
         }
     >()
     const playerRecipients: NotificationRecipient[] = []
-    for (const [userId, teamIds] of teamIdsByUser) {
+    for (const userId of playerIds) {
         const u = userById.get(userId)
         if (!u) continue
-        const items = teamIds
-            .flatMap((id) => itemsByTeam.get(id) ?? [])
-            .sort(byStartTime)
+        const teamIds = teamIdsByUser.get(userId) ?? []
+        const subbing = [...(subbingByUser.get(userId) ?? [])]
+        const items = [
+            ...teamIds.flatMap((id) => itemsByTeam.get(id) ?? []),
+            ...subbing.flatMap(([teamId, entry]) => {
+                const subFor = `${entry.forUserIds.map(nameOf).join(" & ")} (${teamNameById.get(teamId) ?? "TBD"})`
+                return (itemsByTeam.get(teamId) ?? [])
+                    .filter(
+                        (item) =>
+                            entry.matchIds.has(item.matchId) ||
+                            item.matchNum !== null
+                    )
+                    .map((item) => ({ ...item, subFor }))
+            })
+        ].sort(byStartTime)
+        if (items.length === 0) continue
         const coveredBy = matchSubRows.find(
             (r) => r.originalUserId === userId && teamIds.includes(r.teamId)
         )
+        const you: PlayerNightStatus = coveredBy
+            ? { status: "subbed_out", subName: nameOf(coveredBy.subUserId) }
+            : teamIds.length === 0
+              ? {
+                    status: "subbing",
+                    teams: subbing.map(([teamId, entry]) => {
+                        const captainId = captainByTeam.get(teamId)
+                        return {
+                            teamName: teamNameById.get(teamId) ?? "TBD",
+                            forName: entry.forUserIds.map(nameOf).join(" & "),
+                            captainName: captainId ? nameOf(captainId) : null
+                        }
+                    })
+                }
+              : unavailableIds.has(userId)
+                ? { status: "unavailable" }
+                : { status: "available" }
         nightByUser.set(userId, {
             teamName: teamIds
                 .map((id) => teamNameById.get(id) ?? "")
                 .filter(Boolean)
                 .join(", "),
             items: items.map(toEmailItem),
-            teams: teamIds.flatMap((id) => availabilityByTeam.get(id) ?? []),
-            you: coveredBy
-                ? { status: "subbed_out", subName: nameOf(coveredBy.subUserId) }
-                : unavailableIds.has(userId)
-                  ? { status: "unavailable" }
-                  : { status: "available" }
+            teams: [...teamIds, ...subbing.map(([teamId]) => teamId)].flatMap(
+                (id) => availabilityByTeam.get(id) ?? []
+            ),
+            you
         })
         playerRecipients.push({
             userId: u.id,
@@ -447,6 +521,7 @@ export async function sendGameRemindersForDate(
         const list = refMatchesByUser.get(r.userId) ?? []
         list.push({
             role: "ref",
+            matchId: match.id,
             time: match.time,
             court: match.court,
             matchupLabel: matchupLabelById.get(match.id) ?? match.divisionName,

@@ -418,6 +418,8 @@ export interface GameReminderItem {
     matchNum: number | null
     /** e.g. "If you win match 1"; null when the match is certain. */
     condition: string | null
+    /** One-night subs only: who they cover, e.g. "Casey Covered (Home Heroes)". */
+    subFor?: string
 }
 
 function renderGameReminderItem(
@@ -441,7 +443,8 @@ function renderGameReminderItem(
             : "",
         renderDetailRow("Time:", item.timeLabel),
         renderDetailRow("Court:", item.courtLabel),
-        renderDetailRow("Matchup:", item.matchupLabel)
+        renderDetailRow("Matchup:", item.matchupLabel),
+        item.subFor ? renderDetailRow("Subbing for:", item.subFor) : ""
     ].filter(Boolean)
     return renderDetailsBlock([condition, ...rows])
 }
@@ -462,6 +465,15 @@ export type PlayerNightStatus =
     | { status: "available" }
     | { status: "unavailable" }
     | { status: "subbed_out"; subName: string }
+    | {
+          /** A one-night sub with no team of their own playing that night. */
+          status: "subbing"
+          teams: Array<{
+              teamName: string
+              forName: string
+              captainName: string | null
+          }>
+      }
 
 function renderNameList(label: string, names: string[]): string {
     if (names.length === 0) return ""
@@ -493,6 +505,14 @@ function renderPlayerStatus(you: PlayerNightStatus): string {
     if (you.status === "subbed_out") {
         return `<p>You're marked as <strong>not playing</strong> tomorrow; ${escapeHtml(you.subName)} is subbing in for you.</p>`
     }
+    if (you.status === "subbing") {
+        return you.teams
+            .map(
+                (t) =>
+                    `<p>You're subbing in for <strong>${escapeHtml(t.forName)}</strong> on ${escapeHtml(t.teamName)} — thank you! If you can no longer make it, please let ${t.captainName ? `the captain, ${escapeHtml(t.captainName)},` : "the team's captain"} know as soon as you can.</p>`
+            )
+            .join("")
+    }
     if (you.status === "unavailable") {
         return `<p>You're marked as <strong>not available</strong> tomorrow. If that's changed, ${update} so your captain knows.</p>`
     }
@@ -517,9 +537,13 @@ export function buildGameReminderHtml(opts: {
             ? single
                 ? "You're scheduled to referee a match tomorrow:"
                 : `You're scheduled to referee ${opts.items.length} matches tomorrow, ${escapeHtml(opts.dateLabel)}:`
-            : single
-              ? `Your team${team} has a match tomorrow:`
-              : `Here's everything your team${team} has on tomorrow, ${escapeHtml(opts.dateLabel)}:`
+            : !opts.teamName && opts.you?.status === "subbing"
+              ? single
+                  ? "You're subbing in for a match tomorrow:"
+                  : `Here's everything you're subbing in for tomorrow, ${escapeHtml(opts.dateLabel)}:`
+              : single
+                ? `Your team${team} has a match tomorrow:`
+                : `Here's everything your team${team} has on tomorrow, ${escapeHtml(opts.dateLabel)}:`
     const conditional = opts.items.some((item) => item.condition)
     const isPlayoff = opts.items.some((item) => item.matchNum !== null)
 

@@ -353,5 +353,42 @@ describe("sendGameRemindersForDate", () => {
         expect(messagesTo(covered.email)[0].htmlBody).toContain(
             "Sam Sub is subbing in for you"
         )
+
+        // The sub, who has no team of their own, gets the same night.
+        const toSub = messagesTo(sub.email)
+        expect(toSub).toHaveLength(1)
+        expect(toSub[0].subject).toContain("7:00")
+        expect(toSub[0].htmlBody).toContain("subbing in for a match tomorrow")
+        expect(toSub[0].htmlBody).toContain(
+            "subbing in for <strong>Casey Covered</strong> on Home Heroes"
+        )
+        expect(toSub[0].htmlBody).toContain("the captain, Test User")
+        expect(toSub[0].htmlBody).toContain("Casey Covered (Home Heroes)")
+        expect(toSub[0].htmlBody).toContain("Who's coming — Home Heroes")
+    })
+
+    it("gives a playoff sub every bracket match the covered team may have", async () => {
+        const { season, s2 } = await seedPlayoffNight()
+        const [m1] = await db
+            .select({ id: matches.id })
+            .from(matches)
+            .where(eq(matches.home_team, s2.team.id))
+        const sub = await createUser()
+        await db.insert(matchSubstitutions).values({
+            match: m1.id,
+            team: s2.team.id,
+            season: season.id,
+            original_user: s2.player.id,
+            sub_user: sub.id,
+            performed_by: s2.player.id
+        })
+
+        const result = await sendGameRemindersForDate(TARGET_DATE)
+        expect(result.playersSent).toBe(4)
+        const [toSub] = messagesTo(sub.email)
+        expect(toSub.htmlBody).toContain("Match #1")
+        expect(toSub.htmlBody).toContain("If you win match 1")
+        expect(toSub.htmlBody).toContain("If you lose match 1")
+        expect(toSub.htmlBody).toContain("Subbing for:")
     })
 })
