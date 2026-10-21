@@ -15,6 +15,7 @@ import {
     coveragePresence,
     individual_divisions,
     matches,
+    playoffMatchesMeta,
     seasonEvents,
     seasons,
     teams,
@@ -23,8 +24,11 @@ import {
     userUnavailability
 } from "@/database/schema"
 import { getRecipientsWithRole } from "@/lib/rbac"
+import { getTeamRosterWithSubs } from "@/lib/roster"
 import { getScheduleForUsers } from "@/lib/schedule-items"
+import { type BracketMatch, certainBracketAppearances } from "./bracket"
 import {
+    type BracketInput,
     type BuildCoverageInput,
     type CoachInput,
     type CoverageEventInput,
@@ -193,7 +197,10 @@ export async function loadCoverage(opts: {
         }
     }
 
-    const bundle = await getScheduleForUsers(userIds, season.id)
+    const [bundle, bracket] = await Promise.all([
+        getScheduleForUsers(userIds, season.id),
+        loadBracketPresence(season.id, rangeDates, userIdSet, coachesByTeam)
+    ])
 
     // Unavailability is only needed for in-range nights: out-of-range events
     // are dropped by buildCoverage anyway (they have no matches passed in).
@@ -221,7 +228,8 @@ export async function loadCoverage(opts: {
         matches: slotMatches,
         items: bundle.items,
         presence: presenceRows.filter((p) => rangeDates.has(p.date)),
-        coaching,
+        coaching: [...coaching, ...bracket.coaching],
+        bracket: bracket.presence,
         unavailable: new Set(
             unavailRows.map((r) => `${r.userId}|${r.eventId}`)
         ),
@@ -230,6 +238,76 @@ export async function loadCoverage(opts: {
         leadershipIds
     }
     return buildCoverage(input)
+}
+
+/**
+ * Playoff time slots the pool is certain to be in on a night whose results
+ * are not in yet (see bracket.ts), per roster member, and per coach where
+ * the team is certain to play (coaches are not credited for work duty).
+ */
+async function loadBracketPresence(
+    seasonId: number,
+    rangeDates: Set<string>,
+    userIdSet: Set<string>,
+    coachesByTeam: Map<number, string[]>
+): Promise<{ presence: BracketInput[]; coaching: CoachInput[] }> {
+    const rows = await db
+        .select({
+            divisionId: playoffMatchesMeta.division,
+            matchNum: playoffMatchesMeta.match_num,
+            homeSource: playoffMatchesMeta.home_source,
+            awaySource: playoffMatchesMeta.away_source,
+            workSource: playoffMatchesMeta.work_source,
+            workTeamId: playoffMatchesMeta.work_team,
+            date: matches.date,
+            startTime: matches.time,
+            homeTeamId: matches.home_team,
+            awayTeamId: matches.away_team,
+            winnerTeamId: matches.winner
+        })
+        .from(playoffMatchesMeta)
+        .innerJoin(matches, eq(playoffMatchesMeta.match_id, matches.id))
+        .where(eq(playoffMatchesMeta.season, seasonId))
+    if (rows.length === 0) return { presence: [], coaching: [] }
+
+    const byDivision = new Map<number, BracketMatch[]>()
+    for (const { divisionId, ...m } of rows) {
+        const list = byDivision.get(divisionId) ?? []
+        // Playoff rows carry date "" until the night is configured.
+        list.push({ ...m, date: m.date || null })
+        byDivision.set(divisionId, list)
+    }
+    const appearances = [...byDivision.values()]
+        .flatMap(certainBracketAppearances)
+        .filter((a) => rangeDates.has(a.date))
+    if (appearances.length === 0) return { presence: [], coaching: [] }
+
+    const usersByTeam = new Map<number, string[]>()
+    for (const r of await getTeamRosterWithSubs(seasonId)) {
+        if (!userIdSet.has(r.activeUser.id)) continue
+        const list = usersByTeam.get(r.teamId) ?? []
+        list.push(r.activeUser.id)
+        usersByTeam.set(r.teamId, list)
+    }
+
+    const presence: BracketInput[] = []
+    const coaching: CoachInput[] = []
+    for (const a of appearances) {
+        for (const userId of usersByTeam.get(a.teamId) ?? []) {
+            presence.push({
+                userId,
+                date: a.date,
+                startTime: a.startTime,
+                source: a.role
+            })
+        }
+        if (a.role !== "play") continue
+        for (const userId of coachesByTeam.get(a.teamId) ?? []) {
+            if (!userIdSet.has(userId)) continue
+            coaching.push({ userId, date: a.date, startTime: a.startTime })
+        }
+    }
+    return { presence, coaching }
 }
 
 /**

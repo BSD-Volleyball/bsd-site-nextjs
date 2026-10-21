@@ -5,7 +5,14 @@
 
 export type CoverageStatus = "green" | "yellow" | "red"
 
-export type CoverageSource = "play" | "work" | "ref" | "coach" | "present"
+export type CoverageSource =
+    | "play"
+    | "work"
+    /** Playoffs: on a match whose result decides which of the two it is. */
+    | "play_or_work"
+    | "ref"
+    | "coach"
+    | "present"
 
 export interface CoveragePerson {
     userId: string

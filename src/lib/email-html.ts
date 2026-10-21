@@ -691,6 +691,7 @@ const COVERAGE_SOURCE_LABEL: Record<CoveragePerson["sources"][number], string> =
     {
         play: "playing",
         work: "working",
+        play_or_work: "playing or working",
         ref: "reffing",
         coach: "coaching",
         present: "present"

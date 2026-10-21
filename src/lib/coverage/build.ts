@@ -41,6 +41,17 @@ export interface CoachInput {
     startTime: string | null
 }
 
+/**
+ * A playoff appearance certain before the results that decide it (from
+ * certainBracketAppearances, per roster member). See bracket.ts.
+ */
+export interface BracketInput {
+    userId: string
+    date: string
+    startTime: string | null
+    source: "play" | "work" | "play_or_work"
+}
+
 export interface BuildCoverageInput {
     events: CoverageEventInput[]
     matches: CoverageMatchInput[]
@@ -48,6 +59,7 @@ export interface BuildCoverageInput {
     presence: PresenceInput[]
     /** Coach (captain/captain2) rows for teams in coaches-mode divisions. */
     coaching: CoachInput[]
+    bracket: BracketInput[]
     /** "userId|eventId" pairs from user_unavailability. */
     unavailable: Set<string>
     people: Map<string, SchedulePerson>
@@ -58,6 +70,7 @@ export interface BuildCoverageInput {
 const SOURCE_ORDER: CoverageSource[] = [
     "play",
     "work",
+    "play_or_work",
     "ref",
     "coach",
     "present"
@@ -103,6 +116,12 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
         const list = coachingByDate.get(c.date) ?? []
         list.push(c)
         coachingByDate.set(c.date, list)
+    }
+    const bracketByDate = new Map<string, BracketInput[]>()
+    for (const b of input.bracket) {
+        const list = bracketByDate.get(b.date) ?? []
+        list.push(b)
+        bracketByDate.set(b.date, list)
     }
 
     const events = [...input.events].sort((a, b) =>
@@ -190,6 +209,12 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
             const key = slotKey(c.startTime)
             if (!matchCountByKey.has(key)) continue
             acc(key, c.userId).sources.add("coach")
+        }
+
+        for (const b of bracketByDate.get(event.date) ?? []) {
+            const key = slotKey(b.startTime)
+            if (!matchCountByKey.has(key)) continue
+            acc(key, b.userId).sources.add(b.source)
         }
 
         const orphanedPresence: OrphanedPresence[] = []

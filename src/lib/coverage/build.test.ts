@@ -88,6 +88,7 @@ function baseInput(over: Partial<BuildCoverageInput> = {}): BuildCoverageInput {
         items: [],
         presence: [],
         coaching: [],
+        bracket: [],
         unavailable: new Set(),
         people: new Map([
             ["a1", ADMIN],
@@ -548,6 +549,43 @@ describe("buildCoverage", () => {
             baseInput({
                 coaching: [
                     { userId: "a1", date: "2026-10-06", startTime: "18:30:00" }
+                ]
+            })
+        )
+        expect(d.slots.flatMap((s) => s.people)).toHaveLength(0)
+    })
+
+    it("an admin certain to play or work a playoff slot counts there", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                items: [playItem("a1", "2026-10-06", "19:00:00")],
+                bracket: [
+                    {
+                        userId: "a1",
+                        date: "2026-10-06",
+                        startTime: "20:00:00",
+                        source: "play_or_work"
+                    }
+                ]
+            })
+        )
+        const p = d.slots[1].people[0]
+        expect(p.userId).toBe("a1")
+        expect(p.counts).toBe(true)
+        expect(p.sources).toEqual(["play_or_work"])
+        expect(d.status).toBe("red") // 21:00 still has nobody
+    })
+
+    it("ignores a bracket row at a non-slot time", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                bracket: [
+                    {
+                        userId: "a1",
+                        date: "2026-10-06",
+                        startTime: "18:30:00",
+                        source: "work"
+                    }
                 ]
             })
         )

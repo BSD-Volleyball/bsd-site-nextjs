@@ -61,6 +61,7 @@ const STATUS_BADGE: Record<CoverageStatus, string> = {
 const SOURCE_LABEL = {
     play: "playing",
     work: "working",
+    play_or_work: "playing or working",
     ref: "reffing",
     coach: "coaching",
     present: "present"
