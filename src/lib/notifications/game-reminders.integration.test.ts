@@ -4,15 +4,18 @@ import { db } from "@/database/db"
 import {
     drafts,
     matchReferees,
+    matchSubstitutions,
     matches,
     notificationOptouts,
-    playoffMatchesMeta
+    playoffMatchesMeta,
+    userUnavailability
 } from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
     createDivision,
     createMatch,
     createSeason,
+    createSeasonEvent,
     createTeam
 } from "@/test/factories"
 import { createUser } from "@/test/session"
@@ -257,5 +260,98 @@ describe("sendGameRemindersForDate", () => {
         expect(middle.htmlBody).toContain("Work:")
         expect(middle.htmlBody).not.toContain("Play:")
         expect(middle.htmlBody).not.toContain("If you")
+    })
+
+    it("sends a referee one email for all their matches that night", async () => {
+        const { season, match } = await seedMatchDay()
+        const late = await createMatch({
+            season: season.id,
+            division: match.division,
+            date: TARGET_DATE,
+            time: "20:40:00",
+            court: 3,
+            home_team: match.away_team,
+            away_team: match.home_team
+        })
+        const referee = await createUser()
+        await db.insert(matchReferees).values(
+            [late, match].map((m) => ({
+                match_id: m.id,
+                referee_id: referee.id,
+                season_id: season.id,
+                role: "primary"
+            }))
+        )
+
+        const result = await sendGameRemindersForDate(TARGET_DATE)
+        expect(result.refereesSent).toBe(1)
+        const sent = messagesTo(referee.email)
+        expect(sent).toHaveLength(1)
+        expect(sent[0].subject).toContain("7:00")
+        expect(sent[0].htmlBody).toContain("referee 2 matches")
+        expect(sent[0].htmlBody.indexOf("7:00 PM")).toBeLessThan(
+            sent[0].htmlBody.indexOf("8:40 PM")
+        )
+
+        // Re-running the night sends nothing more.
+        mockedSendBatch.mockClear()
+        const again = await sendGameRemindersForDate(TARGET_DATE)
+        expect(again.refereesSkipped).toBe(1)
+        expect(messagesTo(referee.email)).toHaveLength(0)
+    })
+
+    it("shows each player their own and their team's availability for the night", async () => {
+        const { season, homePlayer, homeTeam, match } = await seedMatchDay()
+        const away = await createUser({
+            first_name: "Avery",
+            last_name: "Away"
+        })
+        const covered = await createUser({
+            first_name: "Casey",
+            last_name: "Covered"
+        })
+        const sub = await createUser({
+            first_name: "Sam",
+            last_name: "Sub",
+            male: false
+        })
+        await db.insert(drafts).values([
+            { team: homeTeam.id, user: away.id, round: 2, overall: 3 },
+            { team: homeTeam.id, user: covered.id, round: 3, overall: 5 }
+        ])
+        const night = await createSeasonEvent(season.id, {
+            event_type: "regular_season",
+            event_date: TARGET_DATE
+        })
+        await db
+            .insert(userUnavailability)
+            .values({ user_id: away.id, event_id: night.id })
+        await db.insert(matchSubstitutions).values({
+            match: match.id,
+            team: homeTeam.id,
+            season: season.id,
+            original_user: covered.id,
+            sub_user: sub.id,
+            performed_by: homePlayer.id
+        })
+
+        await sendGameRemindersForDate(TARGET_DATE)
+
+        const [toHome] = messagesTo(homePlayer.email)
+        expect(toHome.htmlBody).toContain(
+            "marked as <strong>available</strong>"
+        )
+        expect(toHome.htmlBody).toContain("Who's coming — Home Heroes")
+        expect(toHome.htmlBody).toContain("Sam Sub (for Casey Covered)")
+        expect(toHome.htmlBody).toMatch(/Not available \(2\)/)
+        expect(toHome.htmlBody).toContain("Avery Away")
+        expect(toHome.htmlBody).toContain("2 expected")
+
+        expect(messagesTo(away.email)[0].htmlBody).toContain(
+            "marked as <strong>not available</strong>"
+        )
+        expect(messagesTo(covered.email)[0].htmlBody).toContain(
+            "Sam Sub is subbing in for you"
+        )
     })
 })

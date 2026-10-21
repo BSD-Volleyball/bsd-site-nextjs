@@ -17,7 +17,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm"
 import { formatEventDate, formatSeasonLabel } from "@/lib/season-utils"
 import { formatDisplayName, formatPlayerName } from "@/lib/utils"
 
-type PlayerSummary = {
+export type PlayerSummary = {
     id: string
     firstName: string
     lastName: string

@@ -410,7 +410,7 @@ export function buildFriendAcceptedHtml(opts: {
 
 /** One match a reminder covers: one the recipient plays, works or referees. */
 export interface GameReminderItem {
-    role: "play" | "work"
+    role: "play" | "work" | "ref"
     timeLabel: string
     courtLabel: string
     matchupLabel: string
@@ -431,7 +431,11 @@ function renderGameReminderItem(
         dateLabel ? renderDetailRow("Date:", dateLabel) : "",
         item.matchNum !== null
             ? renderDetailRow(
-                  item.role === "play" ? "Play:" : "Work:",
+                  item.role === "play"
+                      ? "Play:"
+                      : item.role === "work"
+                        ? "Work:"
+                        : "Match:",
                   `Match #${item.matchNum}`
               )
             : "",
@@ -442,18 +446,77 @@ function renderGameReminderItem(
     return renderDetailsBlock([condition, ...rows])
 }
 
+/** Who one team can expect on the night, from availability and subs. */
+export interface TeamNightAvailability {
+    teamName: string
+    available: string[]
+    subbingIn: Array<{ name: string; forName: string }>
+    /** Marked unavailable, or covered by a one-night sub. */
+    unavailable: string[]
+    /** Of available + subbing in. */
+    maleCount: number
+    nonMaleCount: number
+}
+
+export type PlayerNightStatus =
+    | { status: "available" }
+    | { status: "unavailable" }
+    | { status: "subbed_out"; subName: string }
+
+function renderNameList(label: string, names: string[]): string {
+    if (names.length === 0) return ""
+    return `<div style="padding:3px 0;">
+        <div style="color:#6b7280;">${escapeHtml(label)} (${names.length})</div>
+        <div style="font-weight:600;">${names.map(escapeHtml).join(", ")}</div>
+    </div>`
+}
+
+function renderTeamAvailability(team: TeamNightAvailability): string {
+    const playing = team.available.length + team.subbingIn.length
+    return `
+        <p style="margin:20px 0 4px;font-weight:600;">Who's coming — ${escapeHtml(team.teamName)}</p>
+        ${renderDetailsBlock([
+            renderNameList("Available", team.available),
+            renderNameList(
+                "Subbing in",
+                team.subbingIn.map((s) =>
+                    s.forName ? `${s.name} (for ${s.forName})` : s.name
+                )
+            ),
+            renderNameList("Not available", team.unavailable),
+            `<div style="padding:6px 0 0;color:#6b7280;font-size:13px;">${playing} expected: ${team.maleCount} male, ${team.nonMaleCount} non-male</div>`
+        ])}`
+}
+
+function renderPlayerStatus(you: PlayerNightStatus): string {
+    const update = `<a href="${escapeHtml(site.url)}/dashboard/my-availability">update your availability</a>`
+    if (you.status === "subbed_out") {
+        return `<p>You're marked as <strong>not playing</strong> tomorrow; ${escapeHtml(you.subName)} is subbing in for you.</p>`
+    }
+    if (you.status === "unavailable") {
+        return `<p>You're marked as <strong>not available</strong> tomorrow. If that's changed, ${update} so your captain knows.</p>`
+    }
+    return `<p>You're marked as <strong>available</strong>. Can't make it? Please ${update} so your captain knows.</p>`
+}
+
 export function buildGameReminderHtml(opts: {
     firstName: string
     role: "player" | "referee"
     dateLabel: string
     teamName: string | null
     items: GameReminderItem[]
+    /** Players only: the recipient's own availability for the night. */
+    you?: PlayerNightStatus
+    /** Players only: each of the recipient's teams that night. */
+    teams?: TeamNightAvailability[]
 }): string {
     const team = opts.teamName ? ` (${escapeHtml(opts.teamName)})` : ""
     const single = opts.items.length === 1
     const intro =
         opts.role === "referee"
-            ? "You're scheduled to referee a match tomorrow:"
+            ? single
+                ? "You're scheduled to referee a match tomorrow:"
+                : `You're scheduled to referee ${opts.items.length} matches tomorrow, ${escapeHtml(opts.dateLabel)}:`
             : single
               ? `Your team${team} has a match tomorrow:`
               : `Here's everything your team${team} has on tomorrow, ${escapeHtml(opts.dateLabel)}:`
@@ -472,6 +535,8 @@ export function buildGameReminderHtml(opts: {
                 )
                 .join("")}
             ${conditional ? "<p>The matches marked “If you…” depend on results earlier in the night.</p>" : ""}
+            ${opts.you ? renderPlayerStatus(opts.you) : ""}
+            ${(opts.teams ?? []).map(renderTeamAvailability).join("")}
             <p style="font-size:12px;color:#9ca3af;">Don't want these reminders? <a href="${escapeHtml(site.publicUrl)}/dashboard/notifications" style="color:#9ca3af;">Manage your email preferences</a>.</p>
         `,
         action: isPlayoff ? "View Playoff Bracket" : "View Schedule",
