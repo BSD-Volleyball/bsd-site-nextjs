@@ -3,13 +3,16 @@
  * My Availability action and the admin Edit Player action so the two stay in
  * lockstep on validation and captain notification.
  */
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
 import { site } from "@/config/site"
 import { db } from "@/database/db"
 import {
     divisions,
+    individual_divisions,
     seasonEvents,
+    seasonRefs,
     teams,
+    userRoles,
     userUnavailability,
     users,
     week1Rosters
@@ -20,6 +23,7 @@ import {
 } from "@/lib/email-html"
 import { sendMail } from "@/lib/email/send"
 import { dispatchNotification } from "@/lib/notifications/dispatch"
+import type { Role } from "@/lib/permissions"
 import { getRecipientsWithRole } from "@/lib/rbac"
 import { findActiveTeamForUser } from "@/lib/roster"
 import { formatEventDate } from "@/lib/site-config"
@@ -311,4 +315,69 @@ export async function selectUnavailableEventIds(
             )
         )
     return rows.map((r) => r.eventId)
+}
+
+/** Roles whose holders are asked for availability without playing. */
+const STAFF_AVAILABILITY_ROLES: Role[] = [
+    "admin",
+    "leadership_group",
+    "referee"
+]
+
+/**
+ * Whether a user without a signup may still set availability for a season:
+ * the people Coverage, ref scheduling and coaching plan around. That is an
+ * admin, leadership_group or referee role (global, or bound to this season),
+ * a season_refs listing, or coaching a team (captain/captain2 in a
+ * coaches-mode division). Players with a signup use their signup instead.
+ */
+export async function hasStaffAvailabilityAccess(
+    userId: string,
+    seasonId: number
+): Promise<boolean> {
+    const [role, ref, coach] = await Promise.all([
+        db
+            .select({ id: userRoles.id })
+            .from(userRoles)
+            .where(
+                and(
+                    eq(userRoles.user_id, userId),
+                    inArray(userRoles.role, STAFF_AVAILABILITY_ROLES),
+                    or(
+                        isNull(userRoles.season_id),
+                        eq(userRoles.season_id, seasonId)
+                    )
+                )
+            )
+            .limit(1),
+        db
+            .select({ id: seasonRefs.id })
+            .from(seasonRefs)
+            .where(
+                and(
+                    eq(seasonRefs.season_id, seasonId),
+                    eq(seasonRefs.user_id, userId)
+                )
+            )
+            .limit(1),
+        db
+            .select({ id: teams.id })
+            .from(teams)
+            .innerJoin(
+                individual_divisions,
+                and(
+                    eq(individual_divisions.season, teams.season),
+                    eq(individual_divisions.division, teams.division),
+                    eq(individual_divisions.coaches, true)
+                )
+            )
+            .where(
+                and(
+                    eq(teams.season, seasonId),
+                    or(eq(teams.captain, userId), eq(teams.captain2, userId))
+                )
+            )
+            .limit(1)
+    ])
+    return role.length > 0 || ref.length > 0 || coach.length > 0
 }

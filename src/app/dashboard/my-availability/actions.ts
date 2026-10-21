@@ -13,6 +13,7 @@ import {
 } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
 import {
+    hasStaffAvailabilityAccess,
     notifyAdminsOfTryoutRosterConflict,
     notifyCaptainsOfAvailabilityChange,
     resolveSeasonEvents,
@@ -126,7 +127,8 @@ export const updatePlayerAvailability = withAction(
     }
 )
 
-// For refs who are not players — no signup_id, just user_id
+// For admins, leadership, refs and coaches who are not players — no
+// signup_id, just user_id
 export const updateRefAvailability = withAction(
     async (unavailableEventIds: number[]): Promise<ActionResult> => {
         const session = await requireSession()
@@ -134,6 +136,14 @@ export const updateRefAvailability = withAction(
         const config = await getSeasonConfig()
         if (!config.seasonId) {
             return fail("There is no active season at this time.")
+        }
+        if (
+            !(await hasStaffAvailabilityAccess(
+                session.user.id,
+                config.seasonId
+            ))
+        ) {
+            return fail("Unauthorized.")
         }
 
         const eventIds = [...new Set(unavailableEventIds)]
@@ -174,10 +184,10 @@ export const updateRefAvailability = withAction(
 
         await logAvailabilityChange({
             userId: session.user.id,
-            // No signup to point at — a ref's availability hangs off the user.
+            // No signup to point at — staff availability hangs off the user.
             entityId: session.user.id,
             events: savedEvents,
-            context: "Ref availability"
+            context: "Staff availability"
         })
 
         revalidateCalendarFeeds()

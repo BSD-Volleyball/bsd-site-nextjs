@@ -74,6 +74,7 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
     const {
         showSignupLink,
         hasCurrentSeasonSignup,
+        hasStaffAvailability,
         isAdmin,
         isCommissioner,
         hasCaptainPagesAccess,
@@ -207,9 +208,11 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
         navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
     }
 
-    // Insert My Availability after Dashboard (and signup, if present) for players signed up this season.
+    // Insert My Availability after Dashboard (and signup, if present) for players signed up this season,
+    // and for admins, leadership, refs and coaches who are not playing.
     // Once the season is complete, availability no longer applies — hide it.
-    const showMyAvailability = hasCurrentSeasonSignup && phase !== "complete"
+    const canSetAvailability = hasCurrentSeasonSignup || hasStaffAvailability
+    const showMyAvailability = canSetAvailability && phase !== "complete"
     if (showMyAvailability) {
         const dashboardIdx = navItems.findIndex((i) => i.url === "/dashboard")
         navItems = [
@@ -398,13 +401,13 @@ export function buildSidebarSections(data: SidebarData): SidebarSections {
         items: alwaysHiddenAdminItems
     })
 
-    // My Availability — hidden when user has no current-season signup,
-    // or when the season is complete (availability is no longer relevant).
+    // My Availability — hidden when user has no current-season signup or
+    // staff role, or when the season is complete (no longer relevant).
     if (!showMyAvailability) {
         hiddenGroups.push({
-            label: hasCurrentSeasonSignup
+            label: canSetAvailability
                 ? "My Availability (season complete)"
-                : "My Availability (no signup)",
+                : "My Availability (no signup or role)",
             items: [myAvailabilityNavItem]
         })
     }

@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger"
 
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import { hasStaffAvailabilityAccess } from "@/lib/availability"
 import { checkSignupEligibility } from "@/lib/site-config"
 import { db } from "@/database/db"
 import {
@@ -217,6 +218,8 @@ interface TournamentSidebarInfo {
 export interface SidebarData {
     showSignupLink: boolean
     hasCurrentSeasonSignup: boolean
+    /** Not playing, but an admin, leadership, ref or coach this season. */
+    hasStaffAvailability: boolean
     isAdmin: boolean
     isCommissioner: boolean
     hasCaptainPagesAccess: boolean
@@ -240,6 +243,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
         return {
             showSignupLink: false,
             hasCurrentSeasonSignup: false,
+            hasStaffAvailability: false,
             isAdmin: false,
             isCommissioner: false,
             hasCaptainPagesAccess: false,
@@ -272,7 +276,8 @@ export async function loadSidebarData(): Promise<SidebarData> {
         isRefCoordinator,
         historicalNav,
         isCoach,
-        hasSurveys
+        hasSurveys,
+        hasStaffAvailability
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
         seasonId
@@ -361,7 +366,10 @@ export async function loadSidebarData(): Promise<SidebarData> {
                 logger.error("Failed to load survey sidebar flag", {}, error)
                 return false
             }
-        })()
+        })(),
+        seasonId
+            ? hasStaffAvailabilityAccess(session.user.id, seasonId)
+            : Promise.resolve(false)
     ])
 
     const tournament = await getTournamentSidebarInfo(session.user.id)
@@ -369,6 +377,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
     return {
         showSignupLink,
         hasCurrentSeasonSignup,
+        hasStaffAvailability,
         isAdmin,
         isCommissioner,
         hasCaptainPagesAccess,

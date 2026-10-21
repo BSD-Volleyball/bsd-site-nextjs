@@ -55,9 +55,10 @@ export async function selectEventDates(
 /**
  * Record a player's resulting availability.
  *
- * `entityId` is the signup the selection belongs to, or the user id for refs,
- * who have no signup. `context` prefixes the summary to say where the save came
- * from ("At signup", "Ref availability").
+ * `entityId` is the signup the selection belongs to, or the user id for staff
+ * (admins, leadership, refs, coaches) who have no signup. `context` prefixes
+ * the summary to say where the save came from ("At signup", "Staff
+ * availability").
  */
 export async function logAvailabilityChange(
     params: {

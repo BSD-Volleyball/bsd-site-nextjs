@@ -6,11 +6,13 @@ import {
     week3Rosters,
     teams,
     drafts,
-    matches,
-    seasonRefs
+    matches
 } from "@/database/schema"
 import { eq, and, or } from "drizzle-orm"
-import { selectUnavailableEventIds } from "@/lib/availability"
+import {
+    hasStaffAvailabilityAccess,
+    selectUnavailableEventIds
+} from "@/lib/availability"
 import { loadWeek1Audience } from "@/lib/week1-audience"
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -61,19 +63,14 @@ export default async function MyAvailabilityPage() {
         .limit(1)
 
     if (!signup) {
-        // Check if user is a ref for this season — they also need availability management
-        const [seasonRefRow] = await db
-            .select({ id: seasonRefs.id })
-            .from(seasonRefs)
-            .where(
-                and(
-                    eq(seasonRefs.season_id, config.seasonId),
-                    eq(seasonRefs.user_id, session.user.id)
-                )
-            )
-            .limit(1)
-
-        if (!seasonRefRow) {
+        // Admins, leadership, refs and coaches who are not playing still
+        // need to say which nights they will miss.
+        if (
+            !(await hasStaffAvailabilityAccess(
+                session.user.id,
+                config.seasonId
+            ))
+        ) {
             return (
                 <div className="space-y-6">
                     <PageHeader
@@ -87,7 +84,7 @@ export default async function MyAvailabilityPage() {
             )
         }
 
-        // Ref without a player signup — show availability form with no scheduled times
+        // No player signup — show availability form with no scheduled times
         const [unavailRows, refWeek1Audience] = await Promise.all([
             selectUnavailableEventIds(session.user.id, config.seasonId),
             loadWeek1Audience(session.user.id, config.seasonId)

@@ -4,7 +4,9 @@ import { db } from "@/database/db"
 import {
     auditLog,
     drafts,
+    individual_divisions,
     notificationOptouts,
+    seasonRefs,
     userUnavailability,
     week2Rosters
 } from "@/database/schema"
@@ -18,7 +20,7 @@ import {
 } from "@/test/factories"
 import { sentSingleMessages, sentToAddresses } from "@/test/email"
 import { createUser, createUserWithRoles, loginAs } from "@/test/session"
-import { updatePlayerAvailability } from "./actions"
+import { updatePlayerAvailability, updateRefAvailability } from "./actions"
 
 const mockedSendBatch = vi.mocked(sendBatchEmails)
 
@@ -315,5 +317,96 @@ describe("updatePlayerAvailability admin tryout-roster notification", () => {
         const result = await updatePlayerAvailability(signup.id, [tryout2.id])
         expect(result.status).toBe(true)
         expect(sentToAddresses()).toHaveLength(0)
+    })
+})
+
+describe("updateRefAvailability (non-playing staff)", () => {
+    async function seedSeason() {
+        const season = await createSeason()
+        const event = await createSeasonEvent(season.id, {
+            event_type: "playoff",
+            event_date: "2026-10-22",
+            sort_order: 1,
+            label: "Playoffs Week 1"
+        })
+        return { season, event }
+    }
+
+    async function savedIds(userId: string) {
+        const rows = await db
+            .select({ eventId: userUnavailability.event_id })
+            .from(userUnavailability)
+            .where(eq(userUnavailability.user_id, userId))
+        return rows.map((r) => r.eventId)
+    }
+
+    it.each([
+        ["an admin", "admin"],
+        ["a leadership_group member", "leadership_group"]
+    ] as const)("lets %s with no signup save", async (_label, role) => {
+        const { event } = await seedSeason()
+        const user = await createUserWithRoles([{ role }])
+        const result = await updateRefAvailability([event.id])
+        expect(result.status).toBe(true)
+        expect(await savedIds(user.id)).toEqual([event.id])
+    })
+
+    it("lets a referee for this season save", async () => {
+        const { season, event } = await seedSeason()
+        const user = await createUserWithRoles([
+            { role: "referee", seasonId: season.id }
+        ])
+        expect((await updateRefAvailability([event.id])).status).toBe(true)
+        expect(await savedIds(user.id)).toEqual([event.id])
+    })
+
+    it("lets someone listed in season_refs save", async () => {
+        const { season, event } = await seedSeason()
+        const user = await createUserWithRoles([])
+        await db.insert(seasonRefs).values({
+            season_id: season.id,
+            user_id: user.id,
+            max_division_level: 3
+        })
+        expect((await updateRefAvailability([event.id])).status).toBe(true)
+    })
+
+    it("lets a coach in a coaches division save", async () => {
+        const { season, event } = await seedSeason()
+        const division = await createDivision()
+        await db.insert(individual_divisions).values({
+            season: season.id,
+            division: division.id,
+            coaches: true,
+            gender_split: "5-1",
+            teams: 4
+        })
+        const coach = await createUserWithRoles([])
+        await createTeam({
+            season: season.id,
+            division: division.id,
+            captain: coach.id
+        })
+        expect((await updateRefAvailability([event.id])).status).toBe(true)
+        expect(await savedIds(coach.id)).toEqual([event.id])
+    })
+
+    it("refuses a user with no signup and no qualifying role", async () => {
+        const { event } = await seedSeason()
+        const user = await createUserWithRoles([{ role: "captain" }])
+        const result = await updateRefAvailability([event.id])
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+        expect(await savedIds(user.id)).toEqual([])
+    })
+
+    it("refuses a referee role from an earlier season", async () => {
+        const earlier = await createSeason()
+        const { event } = await seedSeason()
+        const user = await createUserWithRoles([
+            { role: "referee", seasonId: earlier.id }
+        ])
+        const result = await updateRefAvailability([event.id])
+        expect(result.status).toBe(false)
+        expect(await savedIds(user.id)).toEqual([])
     })
 })
