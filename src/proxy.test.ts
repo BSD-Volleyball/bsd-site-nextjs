@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import { describe, expect, it } from "vitest"
+import { SIGNED_OUT_LANDING } from "@/components/layout/redirect-to-home"
 import { proxy } from "./proxy"
 
 // better-auth's default (non-secure) cookie name; getSessionCookie only
@@ -39,6 +40,21 @@ describe("proxy", () => {
         expect(location.searchParams.get("redirectTo")).toBe(
             "/dashboard/rosters?week=2"
         )
+    })
+
+    // A cookie better-auth refuses (bad signature, or a name variant the
+    // proxy accepts but the server never reads) is not cleared by
+    // get-session, so the proxy keeps sending "/" to /dashboard while the
+    // dashboard finds no session. Wherever RedirectToHome lands must not
+    // bounce back, or the browser loops (2026-10-22, a player locked out).
+    it("does not bounce the dashboard's signed-out landing back to /dashboard", async () => {
+        const res = await proxy(
+            request(
+                SIGNED_OUT_LANDING,
+                "__Secure-better-auth.session_token=junk"
+            )
+        )
+        expect(res.headers.get("location")).toBeNull()
     })
 
     it("keeps every query parameter of the page in redirectTo", async () => {

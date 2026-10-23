@@ -12,7 +12,9 @@ export async function proxy(request: NextRequest) {
 
     if (pathname === "/") {
         // Signed-in users land on their dashboard instead of the marketing
-        // page. Brand/logo links pass ?stay=1 so they can still view it.
+        // page. Brand/logo links pass ?stay=1 so they can still view it, and
+        // so does the dashboard when it finds no session (RedirectToHome):
+        // the cookie seen here may be one the server rejects.
         if (sessionCookie && searchParams.get("stay") !== "1") {
             return NextResponse.redirect(new URL("/dashboard", request.url))
         }
