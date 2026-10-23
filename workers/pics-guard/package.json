@@ -17,6 +17,9 @@
         "wrangler": "4.151.1"
     },
     "pnpm": {
+        "overrides": {
+            "zod": "^4.6.6"
+        },
         "onlyBuiltDependencies": [
             "workerd",
             "esbuild"
