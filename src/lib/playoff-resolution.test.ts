@@ -5,8 +5,10 @@ import {
     type PlayoffNode,
     resolveOpponentLabel,
     type ResolutionContext,
-    sourceContainsTeam
+    sourceContainsTeam,
+    teamItemsForNode
 } from "@/lib/playoff-resolution"
+import { FOUR_TEAM_PLAYOFF } from "@/lib/schedule-constants"
 
 describe("parseSourceToken", () => {
     it("parses missing and blank sources as none", () => {
@@ -220,5 +222,94 @@ describe("resolveOpponentLabel", () => {
         const ctx = context([])
         const empty: ParsedSource = parseSourceToken(null)
         expect(resolveOpponentLabel(empty, ctx, labels)).toBe("TBD")
+    })
+})
+
+describe("teamItemsForNode on the if-necessary final", () => {
+    const labels = new Map<number, string>([
+        [101, "#1 Aces"],
+        [102, "#2 Blockers"],
+        [103, "#3 Cobras"],
+        [104, "#4 Diggers"]
+    ])
+    // Results so far: 101 is unbeaten through the winners bracket and meets
+    // 102 or 103 (each with one loss) in match 6.
+    const results: Record<number, [number, number]> = {
+        1: [101, 104],
+        2: [102, 103],
+        3: [101, 102],
+        4: [103, 104]
+    }
+    // [home, away] of each match the results above can place.
+    const sides: Record<number, [number, number]> = {
+        1: [101, 104],
+        2: [102, 103],
+        3: [101, 102],
+        4: [104, 103],
+        5: [102, 103],
+        6: [101, 102]
+    }
+    const bracket = (extra: Record<number, [number, number]> = {}) =>
+        context(
+            FOUR_TEAM_PLAYOFF.map((t) => {
+                const [winnerTeamId, loserTeamId] = {
+                    ...results,
+                    ...extra
+                }[t.matchNum] ?? [null, null]
+                return node({
+                    matchNum: t.matchNum,
+                    week: t.week,
+                    homeSource: parseSourceToken(t.homeSeed),
+                    awaySource: parseSourceToken(t.awaySeed),
+                    workSource: parseSourceToken(t.workTeam),
+                    homeTeamId: winnerTeamId && sides[t.matchNum][0],
+                    awayTeamId: winnerTeamId && sides[t.matchNum][1],
+                    winnerTeamId,
+                    loserTeamId
+                })
+            })
+        )
+    const final2 = (ctx: ResolutionContext, teamId: number) =>
+        teamItemsForNode(
+            ctx.nodeByMatchNum.get(7) as PlayoffNode,
+            teamId,
+            ctx,
+            labels
+        ).filter((item) => item.role === "play")
+
+    it("tells the unbeaten team it plays again only if it loses", () => {
+        expect(final2(bracket(), 101)).toEqual([
+            {
+                role: "play",
+                condition: "If you lose match 6",
+                opponentLabel: "Winner of #5"
+            }
+        ])
+    })
+
+    it("tells a losers-bracket team it plays again only if it wins", () => {
+        expect(final2(bracket(), 102)).toEqual([
+            {
+                role: "play",
+                condition: "If you win match 5 and win match 6",
+                opponentLabel: "#1 Aces"
+            }
+        ])
+    })
+
+    it("drops the match once the unbeaten team has won the first final", () => {
+        const ctx = bracket({ 5: [102, 103], 6: [101, 102] })
+        expect(final2(ctx, 101)).toEqual([])
+        expect(final2(ctx, 102)).toEqual([])
+    })
+
+    it("keeps the match for both finalists once it is needed", () => {
+        const ctx = bracket({ 5: [102, 103], 6: [102, 101] })
+        expect(final2(ctx, 101)).toEqual([
+            { role: "play", condition: null, opponentLabel: "#2 Blockers" }
+        ])
+        expect(final2(ctx, 102)).toEqual([
+            { role: "play", condition: null, opponentLabel: "#1 Aces" }
+        ])
     })
 })

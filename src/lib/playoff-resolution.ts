@@ -221,6 +221,94 @@ export interface TeamNodeItem {
     opponentLabel: string | null
 }
 
+// True when every team this source can resolve to arrives without a loss:
+// it is built only from seeds and winners, never from a loser.
+function sourceIsUnbeaten(
+    source: ParsedSource,
+    ctx: ResolutionContext,
+    seenMatchNums: Set<number> = new Set()
+): boolean {
+    if (source.kind === "seed" || source.kind === "team") return true
+    if (source.kind !== "winner" || source.value === null) return false
+    if (seenMatchNums.has(source.value)) return false
+    const node = ctx.nodeByMatchNum.get(source.value)
+    if (!node) return false
+    const nextSeen = new Set(seenMatchNums)
+    nextSeen.add(source.value)
+    return (
+        sourceIsUnbeaten(node.homeSource, ctx, nextSeen) &&
+        sourceIsUnbeaten(node.awaySource, ctx, nextSeen)
+    )
+}
+
+// The double-elimination "if necessary" final (Winner of M10 vs Loser of M10)
+// holds both teams of the first final, but is played only if the team that
+// came through the losers bracket wins that final. So the unbeaten side plays
+// it if it LOSES the first final, the other side if it WINS. Returns null for
+// any other match, or a bracket whose unbeaten side cannot be told apart.
+function resetFinalPlay(
+    node: PlayoffNode,
+    teamId: number,
+    ctx: ResolutionContext,
+    teamLabelById: Map<number, string>
+): TeamNodeItem | "absent" | null {
+    const { homeSource, awaySource } = node
+    if (
+        homeSource.value === null ||
+        homeSource.value !== awaySource.value ||
+        !(
+            (homeSource.kind === "winner" && awaySource.kind === "loser") ||
+            (homeSource.kind === "loser" && awaySource.kind === "winner")
+        )
+    ) {
+        return null
+    }
+    const firstNum = homeSource.value
+    const first = ctx.nodeByMatchNum.get(firstNum)
+    if (!first) return null
+    const homeUnbeaten = sourceIsUnbeaten(first.homeSource, ctx)
+    const awayUnbeaten = sourceIsUnbeaten(first.awaySource, ctx)
+    if (homeUnbeaten === awayUnbeaten) return null
+
+    if (first.winnerTeamId !== null && first.loserTeamId !== null) {
+        const winnerWasUnbeaten =
+            first.winnerTeamId === first.homeTeamId
+                ? homeUnbeaten
+                : awayUnbeaten
+        const otherTeamId =
+            teamId === first.winnerTeamId
+                ? first.loserTeamId
+                : teamId === first.loserTeamId
+                  ? first.winnerTeamId
+                  : null
+        if (winnerWasUnbeaten || otherTeamId === null) return "absent"
+        return {
+            role: "play",
+            condition: null,
+            opponentLabel: teamLabelById.get(otherTeamId) ?? null
+        }
+    }
+
+    const inHome = sourceContainsTeam(first.homeSource, teamId, ctx)
+    const inAway = sourceContainsTeam(first.awaySource, teamId, ctx)
+    if (!inHome.contains && !inAway.contains) return "absent"
+    const side = inHome.contains ? inHome : inAway
+    const verb = (inHome.contains ? homeUnbeaten : awayUnbeaten)
+        ? "lose"
+        : "win"
+    return {
+        role: "play",
+        condition: side.condition
+            ? `${side.condition} and ${verb} match ${firstNum}`
+            : `If you ${verb} match ${firstNum}`,
+        opponentLabel: resolveOpponentLabel(
+            inHome.contains ? first.awaySource : first.homeSource,
+            ctx,
+            teamLabelById
+        )
+    }
+}
+
 // What a team could be doing in one bracket match: a play row if either side
 // can resolve to it, and a work row if the work source can. Both appear for a
 // match the team plays if it wins one earlier match and works if it loses.
@@ -233,7 +321,10 @@ export function teamItemsForNode(
     const items: TeamNodeItem[] = []
     const playHome = sourceContainsTeam(node.homeSource, teamId, ctx)
     const playAway = sourceContainsTeam(node.awaySource, teamId, ctx)
-    if (playHome.contains || playAway.contains) {
+    const reset = resetFinalPlay(node, teamId, ctx, teamLabelById)
+    if (reset !== null) {
+        if (reset !== "absent") items.push(reset)
+    } else if (playHome.contains || playAway.contains) {
         const side = playHome.contains ? playHome : playAway
         items.push({
             role: "play",
