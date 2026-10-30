@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { type BracketMatch, certainBracketAppearances } from "./bracket"
+import { SIX_TEAM_PLAYOFF } from "@/lib/schedule-constants"
+import {
+    type BracketMatch,
+    certainBracketAppearances,
+    ifNeededMatchNums
+} from "./bracket"
 
 const W1 = "2026-10-22"
 const W2 = "2026-10-29"
@@ -156,5 +161,71 @@ describe("certainBracketAppearances", () => {
         expect(
             certainBracketAppearances(bracket).every((a) => a.date === W1)
         ).toBe(true)
+    })
+
+    it("credits nobody at the if-necessary final, which may not be played", () => {
+        // Final night of a six-team bracket: 102 is unbeaten (won M7 over
+        // 104), 106 won the losers bracket (M8). M11 is played only if the
+        // M9 winner beats 102 in M10.
+        const W3 = "2026-11-05"
+        const decided: Record<number, Partial<BracketMatch>> = {
+            7: { homeTeamId: 102, awayTeamId: 104, winnerTeamId: 102 },
+            8: { homeTeamId: 106, awayTeamId: 105, winnerTeamId: 106 },
+            9: { homeTeamId: 104, awayTeamId: 106, workTeamId: 102 },
+            10: { homeTeamId: 102 }
+        }
+        const night = SIX_TEAM_PLAYOFF.map((t) =>
+            match(
+                t.matchNum,
+                t.week === 3 ? W3 : null,
+                `${t.time}:00`,
+                [t.homeSeed, t.awaySeed, t.workTeam],
+                decided[t.matchNum]
+            )
+        )
+        const out = certainBracketAppearances(night)
+        expect(out.filter((a) => a.startTime === "20:40:00")).toEqual([])
+        expect(out).toContainEqual({
+            teamId: 102,
+            date: W3,
+            startTime: "19:50:00",
+            role: "play"
+        })
+    })
+})
+
+describe("ifNeededMatchNums", () => {
+    // A four-team bracket on its final night: 101 is unbeaten into M6.
+    const night = (m6?: Partial<BracketMatch>) => [
+        match(3, W1, "19:50:00", ["W1", "W2", "L2"], {
+            homeTeamId: 101,
+            awayTeamId: 102,
+            winnerTeamId: 101
+        }),
+        match(1, W1, "19:00:00", ["S1", "S4", "S2"]),
+        match(2, W1, "19:50:00", ["S2", "S3", "L1"]),
+        match(5, W2, "19:00:00", ["L3", "W4", "W3"]),
+        match(4, W1, "20:40:00", ["L1", "L2", "L3"]),
+        match(6, W2, "19:50:00", ["W3", "W5", "L5"], {
+            homeTeamId: 101,
+            ...m6
+        }),
+        match(7, W2, "20:40:00", ["W6", "L6", "L5"])
+    ]
+
+    it("flags the reset final while the first final is undecided", () => {
+        expect(ifNeededMatchNums(night())).toEqual(new Set([7]))
+    })
+
+    it("still flags it once the unbeaten team has won the first final", () => {
+        expect(
+            ifNeededMatchNums(night({ awayTeamId: 103, winnerTeamId: 101 }))
+        ).toEqual(new Set([7]))
+    })
+
+    it("clears it once the losers-bracket team has forced it", () => {
+        expect(
+            ifNeededMatchNums(night({ awayTeamId: 103, winnerTeamId: 103 }))
+        ).toEqual(new Set())
     })
 })

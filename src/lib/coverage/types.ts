@@ -39,6 +39,11 @@ export interface CoverageSlot {
     label: string
     matchCount: number
     people: CoveragePerson[]
+    /**
+     * Every match in the slot is an if-necessary final that may not be
+     * played, so the slot is left out of status and slot jobs.
+     */
+    ifNeeded: boolean
 }
 
 export interface OrphanedPresence {

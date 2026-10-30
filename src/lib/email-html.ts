@@ -896,10 +896,10 @@ export function buildCoverageDigestHtml(opts: {
         .map((slot) => {
             const people =
                 slot.people.length === 0
-                    ? `<span style="color:#991b1b;">— nobody —</span>`
+                    ? `<span style="color:${slot.ifNeeded ? "#6b7280" : "#991b1b"};">— nobody —</span>`
                     : slot.people.map(renderCoveragePerson).join("<br/>")
             return `<tr>
-                <td style="padding:8px 12px;border-top:1px solid #e5e7eb;white-space:nowrap;vertical-align:top;font-weight:600;">${escapeHtml(formatSlotLabel(slot.startTime))}<br/><span style="font-weight:400;color:#6b7280;font-size:12px;">${slot.matchCount} match${slot.matchCount === 1 ? "" : "es"}</span></td>
+                <td style="padding:8px 12px;border-top:1px solid #e5e7eb;white-space:nowrap;vertical-align:top;font-weight:600;">${escapeHtml(formatSlotLabel(slot.startTime))}<br/><span style="font-weight:400;color:#6b7280;font-size:12px;">${slot.matchCount} match${slot.matchCount === 1 ? "" : "es"}${slot.ifNeeded ? ", if needed" : ""}</span></td>
                 <td style="padding:8px 12px;border-top:1px solid #e5e7eb;vertical-align:top;">${people}${renderCoverageTasks(day, slot)}</td>
             </tr>`
         })

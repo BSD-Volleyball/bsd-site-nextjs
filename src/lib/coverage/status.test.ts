@@ -17,17 +17,29 @@ function person(counts: boolean): CoveragePerson {
 
 function slot(
     startTime: string | null,
-    people: CoveragePerson[]
+    people: CoveragePerson[],
+    ifNeeded = false
 ): CoverageSlot {
     return {
         startTime,
         label: startTime ?? "TBD",
         matchCount: 1,
-        people
+        people,
+        ifNeeded
     }
 }
 
 describe("computeStatus", () => {
+    it("judges the night without a slot that may not be played", () => {
+        const r = computeStatus([
+            slot("19:00:00", [person(true)]),
+            slot("19:50:00", [person(true)]),
+            slot("20:40:00", [], true)
+        ])
+        expect(r.status).toBe("green")
+        expect(r.reason).toBe("all 2 slots covered")
+    })
+
     it("green when every timed slot has a counting person", () => {
         const r = computeStatus([
             slot("19:00:00", [person(true)]),

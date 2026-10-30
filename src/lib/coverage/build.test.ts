@@ -121,6 +121,30 @@ describe("buildCoverage", () => {
         expect(d.matchCount).toBe(3)
     })
 
+    it("marks a slot of if-necessary finals only as if needed", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                matches: [
+                    { matchId: 1, date: "2026-10-06", startTime: "19:00:00" },
+                    {
+                        matchId: 2,
+                        date: "2026-10-06",
+                        startTime: "19:50:00",
+                        ifNeeded: true
+                    },
+                    { matchId: 3, date: "2026-10-06", startTime: "19:50:00" },
+                    {
+                        matchId: 4,
+                        date: "2026-10-06",
+                        startTime: "20:40:00",
+                        ifNeeded: true
+                    }
+                ]
+            })
+        )
+        expect(d.slots.map((s) => s.ifNeeded)).toEqual([false, false, true])
+    })
+
     it("omits an event date with neither matches nor presence", () => {
         const out = buildCoverage(baseInput({ matches: [], presence: [] }))
         expect(out).toEqual([])

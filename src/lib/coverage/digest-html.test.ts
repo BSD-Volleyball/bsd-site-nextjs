@@ -18,6 +18,7 @@ const DAY: CoverageDate = {
             startTime: "19:00:00",
             label: "7:00 PM",
             matchCount: 3,
+            ifNeeded: false,
             people: [
                 {
                     userId: "a",
@@ -41,7 +42,13 @@ const DAY: CoverageDate = {
                 }
             ]
         },
-        { startTime: "20:00:00", label: "8:00 PM", matchCount: 3, people: [] }
+        {
+            startTime: "20:00:00",
+            label: "8:00 PM",
+            matchCount: 3,
+            people: [],
+            ifNeeded: false
+        }
     ]
 }
 

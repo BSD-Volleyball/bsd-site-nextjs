@@ -9,7 +9,7 @@
  * (team, date, time) appearances that occur in all of them.
  */
 
-import { parseSourceToken } from "@/lib/playoff-sources"
+import { parseSourceToken, resetFinalUnbeatenSide } from "@/lib/playoff-sources"
 import { normalizeTime } from "./format"
 
 export interface BracketMatch {
@@ -47,6 +47,43 @@ interface Placed {
 }
 
 /**
+ * The if-necessary finals of one division that may not be played: a reset
+ * final whose first final is undecided, or was won by the side that came in
+ * unbeaten (which ends the bracket).
+ */
+export function ifNeededMatchNums(division: BracketMatch[]): Set<number> {
+    const byNum = new Map(division.map((m) => [m.matchNum, m]))
+    const refByNum = new Map(
+        division.map((m) => [
+            m.matchNum,
+            {
+                matchNum: m.matchNum,
+                homeSource: parseSourceToken(m.homeSource),
+                awaySource: parseSourceToken(m.awaySource)
+            }
+        ])
+    )
+    const out = new Set<number>()
+    for (const [matchNum, ref] of refByNum) {
+        if (byNum.get(matchNum)?.winnerTeamId !== null) continue
+        const reset = resetFinalUnbeatenSide(
+            ref.homeSource,
+            ref.awaySource,
+            refByNum
+        )
+        const first = reset && byNum.get(reset.firstMatchNum)
+        if (!reset || !first) continue
+        if (first.winnerTeamId !== null) {
+            const winnerSide =
+                first.winnerTeamId === first.homeTeamId ? "home" : "away"
+            if (winnerSide !== reset.unbeaten) continue
+        }
+        out.add(matchNum)
+    }
+    return out
+}
+
+/**
  * Appearances certain in every outcome of one division's bracket, excluding
  * those the schedule engine already credits (a match whose two teams are both
  * set: its players and its set work team), so its sub handling still holds.
@@ -66,6 +103,31 @@ export function certainBracketAppearances(
         away: parseSourceToken(m.awaySource),
         work: parseSourceToken(m.workSource)
     }))
+    const refByNum = new Map(
+        ms.map((m, i) => [
+            m.matchNum,
+            {
+                matchNum: m.matchNum,
+                homeSource: sources[i].home,
+                awaySource: sources[i].away
+            }
+        ])
+    )
+    // The if-necessary final is played only if its first final's unbeaten
+    // side loses; in outcomes where that side wins, nobody is there for it.
+    const resets = ms.map((_, i) =>
+        resetFinalUnbeatenSide(sources[i].home, sources[i].away, refByNum)
+    )
+    const notPlayed = (i: number): boolean => {
+        const reset = resets[i]
+        if (!reset) return false
+        const firstIdx = indexByNum.get(reset.firstMatchNum)
+        if (firstIdx === undefined || firstIdx >= i) return false
+        const first = placed[firstIdx]
+        if (first.winner === null) return false
+        const winnerSide = first.winner === first.home ? "home" : "away"
+        return winnerSide === reset.unbeaten
+    }
 
     // key "team|date|time" → roles seen across outcomes; null before the first.
     const acc: { certain: Map<string, Set<"play" | "work">> | null } = {
@@ -89,7 +151,7 @@ export function certainBracketAppearances(
     const recordOutcome = () => {
         const seen = new Map<string, "play" | "work">()
         for (const [i, m] of ms.entries()) {
-            if (!m.date) continue
+            if (!m.date || notPlayed(i)) continue
             const time = normalizeTime(m.startTime) ?? ""
             const p = placed[i]
             for (const team of [p.home, p.away]) {

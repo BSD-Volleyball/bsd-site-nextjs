@@ -12,6 +12,7 @@
  * `resolveTaskGroups()` keeps only the lines that apply to one night.
  */
 
+import { scheduledSlots } from "./format"
 import type { CoverageDate, CoverageSlot } from "./types"
 
 export type TaskGroupKey = "setup" | "midway" | "cleanup"
@@ -157,7 +158,7 @@ export function slotTaskKeys(
     slot: Pick<CoverageSlot, "startTime">
 ): TaskGroupKey[] {
     if (slot.startTime === null) return []
-    const timed = day.slots.filter((s) => s.startTime !== null)
+    const timed = scheduledSlots(day.slots)
     if (timed.length === 0) return []
     const index = timed.findIndex((s) => s.startTime === slot.startTime)
     if (index === -1) return []

@@ -8,8 +8,14 @@ import {
 } from "./tasks"
 import type { CoverageDate, CoverageSlot } from "./types"
 
-function slot(startTime: string | null): CoverageSlot {
-    return { startTime, label: startTime ?? "TBD", matchCount: 1, people: [] }
+function slot(startTime: string | null, ifNeeded = false): CoverageSlot {
+    return {
+        startTime,
+        label: startTime ?? "TBD",
+        matchCount: 1,
+        people: [],
+        ifNeeded
+    }
 }
 
 function day(
@@ -32,6 +38,17 @@ const text = (groups: ReturnType<typeof slotTaskGroups>) =>
     groups.flatMap((g) => g.lines.map((l) => l.text)).join("\n")
 
 describe("slotTaskKeys", () => {
+    it("gives an if-needed last slot no jobs: cleanup falls to the slot before", () => {
+        const d = day({ eventType: "playoff" }, [
+            slot("19:00:00"),
+            slot("19:50:00"),
+            slot("20:40:00", true)
+        ])
+        expect(slotTaskKeys(d, d.slots[0])).toEqual(["setup", "midway"])
+        expect(slotTaskKeys(d, d.slots[1])).toEqual(["cleanup"])
+        expect(slotTaskKeys(d, d.slots[2])).toEqual([])
+    })
+
     it("setup first, mid-way on the slot before last, cleanup last", () => {
         const d = day()
         expect(slotTaskKeys(d, d.slots[0])).toEqual(["setup"])

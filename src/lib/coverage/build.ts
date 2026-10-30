@@ -25,6 +25,8 @@ export interface CoverageMatchInput {
     matchId: number
     date: string
     startTime: string | null
+    /** An if-necessary final that may not be played (bracket.ts). */
+    ifNeeded?: boolean
 }
 
 interface PresenceInput {
@@ -170,9 +172,11 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
 
         // Slots: distinct normalized start times, TBD last.
         const matchCountByKey = new Map<string, number>()
+        const certainKeys = new Set<string>()
         for (const m of matches) {
             const key = slotKey(m.startTime)
             matchCountByKey.set(key, (matchCountByKey.get(key) ?? 0) + 1)
+            if (!m.ifNeeded) certainKeys.add(key)
         }
         const keys = [...matchCountByKey.keys()].sort((a, b) => {
             if (a === TBD_KEY) return 1
@@ -273,7 +277,8 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
                 startTime,
                 label: formatSlotLabel(startTime),
                 matchCount: matchCountByKey.get(key) ?? 0,
-                people
+                people,
+                ifNeeded: startTime !== null && !certainKeys.has(key)
             }
         })
 

@@ -3,7 +3,12 @@
  */
 
 import { formatMatchTime, formatShortDate } from "@/lib/season-utils"
-import type { CoverageDate, CoveragePerson, CoverageStatus } from "./types"
+import type {
+    CoverageDate,
+    CoveragePerson,
+    CoverageSlot,
+    CoverageStatus
+} from "./types"
 
 /**
  * Canonical "HH:MM:SS". Match times come back from pg as "HH:MM:SS" but
@@ -15,6 +20,16 @@ export function normalizeTime(t: string | null): string | null {
     if (!m) return null
     const hh = m[1].padStart(2, "0")
     return `${hh}:${m[2]}:${m[3] ?? "00"}`
+}
+
+/**
+ * The slots a night is judged on: timed, and certain to be played. Status,
+ * slot jobs and the page's end-slot highlight all start from this.
+ */
+export function scheduledSlots<
+    T extends Pick<CoverageSlot, "startTime" | "ifNeeded">
+>(slots: T[]): T[] {
+    return slots.filter((s) => s.startTime !== null && !s.ifNeeded)
 }
 
 export function formatSlotLabel(t: string | null): string {

@@ -25,7 +25,8 @@ import {
     coverageDateTitle,
     formatCoverageDate,
     formatSlotLabel,
-    personTone
+    personTone,
+    scheduledSlots
 } from "@/lib/coverage/format"
 import type { PersonTone } from "@/lib/coverage/format"
 import {
@@ -173,7 +174,7 @@ function SlotJobs({ date, slot }: { date: CoverageDate; slot: CoverageSlot }) {
 }
 
 function isEndSlot(date: CoverageDate, slot: CoverageSlot): boolean {
-    const timed = date.slots.filter((s) => s.startTime !== null)
+    const timed = scheduledSlots(date.slots)
     return timed[0] === slot || timed[timed.length - 1] === slot
 }
 
@@ -426,6 +427,7 @@ export function CoverageClient({
                                         <div className="text-muted-foreground text-xs">
                                             {slot.matchCount} match
                                             {slot.matchCount === 1 ? "" : "es"}
+                                            {slot.ifNeeded && ", if needed"}
                                         </div>
                                     </div>
                                     <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">

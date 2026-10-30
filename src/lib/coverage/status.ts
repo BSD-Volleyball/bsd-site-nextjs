@@ -3,7 +3,7 @@
  * pill, the email subject and the tests.
  */
 
-import { formatSlotLabel } from "./format"
+import { formatSlotLabel, scheduledSlots } from "./format"
 import type { CoverageSlot, CoverageStatus } from "./types"
 
 function isCovered(slot: CoverageSlot): boolean {
@@ -19,7 +19,7 @@ export function computeStatus(slots: CoverageSlot[]): {
     status: CoverageStatus
     reason: string
 } {
-    const timed = slots.filter((s) => s.startTime !== null)
+    const timed = scheduledSlots(slots)
     if (timed.length === 0) return { status: "red", reason: "no timed slots" }
 
     const first = timed[0]
