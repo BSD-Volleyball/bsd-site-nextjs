@@ -24,6 +24,11 @@ import {
 } from "@/database/schema"
 import { formatEventDate } from "@/lib/date-utils"
 import { formatSourceHumanLabel, parseSourceToken } from "@/lib/playoff-sources"
+import {
+    getLoserTeamId,
+    getWinnerTeamId,
+    type PlayoffMatchScores
+} from "@/lib/playoffs/match-results"
 import { formatDisplayName } from "@/lib/utils"
 
 import { seasonCodeFor } from "./sheet-config"
@@ -158,6 +163,7 @@ export async function loadScoreSheetNight(
         db
             .select({
                 matchId: playoffMatchesMeta.match_id,
+                division: playoffMatchesMeta.division,
                 matchNum: playoffMatchesMeta.match_num,
                 bracket: playoffMatchesMeta.bracket,
                 homeSource: playoffMatchesMeta.home_source,
@@ -199,11 +205,72 @@ export async function loadScoreSheetNight(
             .map((m) => [m.matchId, m])
     )
 
+    // A work source like "Winner of M4" usually names a match decided the
+    // week before, but nothing writes that team back into work_team (the
+    // cascade fills only home and away), so it is settled here from the
+    // referenced match's result. One still to be played keeps its label.
+    const divisionIds = [...new Set(playoffMetaRows.map((m) => m.division))]
+    const bracketResults =
+        divisionIds.length > 0
+            ? await db
+                  .select({
+                      division: playoffMatchesMeta.division,
+                      matchNum: playoffMatchesMeta.match_num,
+                      homeTeamId: matches.home_team,
+                      awayTeamId: matches.away_team,
+                      homeScore: matches.home_score,
+                      awayScore: matches.away_score,
+                      homeSet1Score: matches.home_set1_score,
+                      awaySet1Score: matches.away_set1_score,
+                      homeSet2Score: matches.home_set2_score,
+                      awaySet2Score: matches.away_set2_score,
+                      homeSet3Score: matches.home_set3_score,
+                      awaySet3Score: matches.away_set3_score,
+                      winnerTeamId: matches.winner
+                  })
+                  .from(playoffMatchesMeta)
+                  .innerJoin(
+                      matches,
+                      eq(playoffMatchesMeta.match_id, matches.id)
+                  )
+                  .where(
+                      and(
+                          eq(playoffMatchesMeta.season, seasonId),
+                          inArray(playoffMatchesMeta.division, divisionIds)
+                      )
+                  )
+            : []
+    const resultByBracketMatch = new Map<string, PlayoffMatchScores>(
+        bracketResults.map((r) => [`${r.division}:${r.matchNum}`, r])
+    )
+
+    const workTeamIdFor = (meta: {
+        division: number
+        workTeam: number | null
+        workSource: string | null
+    }): number | null => {
+        if (meta.workTeam !== null) return meta.workTeam
+        const source = parseSourceToken(meta.workSource)
+        if (
+            (source.kind !== "winner" && source.kind !== "loser") ||
+            source.value === null
+        )
+            return null
+        const result = resultByBracketMatch.get(
+            `${meta.division}:${source.value}`
+        )
+        if (!result) return null
+        const winner = getWinnerTeamId(result)
+        return source.kind === "winner"
+            ? winner
+            : getLoserTeamId(result, winner)
+    }
+
     // Work-team names come from the same team pool as the playing teams.
     const workTeamIds = [
         ...new Set(
             playoffMetaRows
-                .map((m) => m.workTeam)
+                .map(workTeamIdFor)
                 .filter((id): id is number => id !== null)
         )
     ]
@@ -216,13 +283,20 @@ export async function loadScoreSheetNight(
             : []
     const workTeamNameById = new Map(workTeamRows.map((t) => [t.id, t.name]))
 
-    /** A named work team when one is assigned, else its bracket label. */
+    /** The work team's name once it is known, else its bracket label. */
     const workTeamLabel = (
-        meta: { workTeam: number | null; workSource: string | null } | undefined
+        meta:
+            | {
+                  division: number
+                  workTeam: number | null
+                  workSource: string | null
+              }
+            | undefined
     ): string | null => {
         if (!meta) return null
-        if (meta.workTeam !== null) {
-            const name = workTeamNameById.get(meta.workTeam)
+        const id = workTeamIdFor(meta)
+        if (id !== null) {
+            const name = workTeamNameById.get(id)
             if (name) return name
         }
         return formatSourceHumanLabel(parseSourceToken(meta.workSource))

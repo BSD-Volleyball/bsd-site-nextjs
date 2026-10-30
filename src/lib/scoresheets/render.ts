@@ -31,7 +31,9 @@ import {
     type TeamRowGeometry
 } from "./layout"
 import {
+    FILL_EXAMPLE,
     FILL_INSTRUCTION,
+    printedMatchNumber,
     ruleLines,
     SCORE_ENTRY_SHORT_URL,
     sheetCode,
@@ -63,6 +65,8 @@ function linkQrPng(): Buffer {
 interface Fonts {
     regular: PDFFont
     bold: PDFFont
+    /** For the example digits, so they read as written rather than printed. */
+    hand: PDFFont
 }
 
 interface EmbeddedImages {
@@ -219,6 +223,59 @@ function drawRules(
         })
         y -= 11
     }
+
+    drawFillExample(page, geometry, fonts)
+}
+
+/**
+ * Two FINAL boxes with a score written in, for the scorekeepers who read
+ * past "one digit per box". Drawn in the accent colour and an oblique face so
+ * it reads as handwriting on the form, not as part of the form.
+ */
+function drawFillExample(page: PDFPage, geometry: SheetGeometry, fonts: Fonts) {
+    const { frame, digits } = geometry.fillExample
+    drawBox(page, frame, 0.6, LIGHT)
+
+    const title = `EXAMPLE: ${FILL_EXAMPLE}`
+    const titleWidth = fonts.bold.widthOfTextAtSize(title, 7)
+    page.drawText(title, {
+        x: frame.x + (frame.w - titleWidth) / 2,
+        y: frame.y + frame.h - 8,
+        size: 7,
+        font: fonts.bold,
+        color: BLACK
+    })
+
+    page.drawText("FINAL", {
+        x: digits[0].x - 26,
+        y: digits[0].y + 5,
+        size: 7.5,
+        font: fonts.bold,
+        color: BLACK
+    })
+    digits.forEach((box, index) => {
+        drawBox(page, box, 1.1, BLACK)
+        const digit = FILL_EXAMPLE[index]
+        const size = 12
+        const width = fonts.hand.widthOfTextAtSize(digit, size)
+        page.drawText(digit, {
+            x: box.x + (box.w - width) / 2,
+            y: box.y + (box.h - size) / 2 + 2,
+            size,
+            font: fonts.hand,
+            color: ACCENT
+        })
+    })
+
+    const caption = "one digit per box"
+    const captionWidth = fonts.regular.widthOfTextAtSize(caption, 6.5)
+    page.drawText(caption, {
+        x: frame.x + (frame.w - captionWidth) / 2,
+        y: frame.y + 3,
+        size: 6.5,
+        font: fonts.regular,
+        color: BLACK
+    })
 }
 
 function drawFooter(
@@ -284,11 +341,7 @@ function drawFooter(
 // --- match blocks ---------------------------------------------------------
 
 function matchHeadline(match: SheetMatch): string {
-    const base = `MATCH #${match.orderOnCourt}`
-    if (match.playoff && match.playoffMatchNum !== null) {
-        return `${base}  (M${match.playoffMatchNum})`
-    }
-    return base
+    return `MATCH #${printedMatchNumber(match)}`
 }
 
 function drawMatchHeader(
@@ -439,7 +492,30 @@ function drawTeamLabel(
     fonts: Fonts
 ) {
     const maxWidth = block.labelColumn.w - 8
-    const { nameBaselineY, captainBaselineY, initials } = row.label
+    const { nameBaselineY, captainBaselineY, initials, writeIn } = row.label
+
+    if (team.isPlaceholder) {
+        // Not known when printed: a line to write the team on, and the slot
+        // it comes from beneath, where a known team's captain would be.
+        drawUnderline(page, writeIn.x, writeIn.y, writeIn.w, BLACK)
+        page.drawText(
+            truncateToFit({
+                text: team.name,
+                maxWidth,
+                fontSize: 9,
+                font: fonts.regular
+            }),
+            {
+                x: block.labelColumn.x,
+                y: captainBaselineY,
+                size: 9,
+                font: fonts.regular,
+                color: GREY
+            }
+        )
+        drawInitials(page, initials, fonts)
+        return
+    }
 
     const fitted = fitTextToCell({
         text: team.name,
@@ -453,7 +529,7 @@ function drawTeamLabel(
         y: nameBaselineY,
         size: fitted.fontSize,
         font: fonts.bold,
-        color: team.isPlaceholder ? GREY : BLACK
+        color: BLACK
     })
 
     if (team.captains.length > 0) {
@@ -474,8 +550,14 @@ function drawTeamLabel(
         )
     }
 
-    // Directly under that captain's own name, so there is no ambiguity about
-    // whose initials belong where.
+    drawInitials(page, initials, fonts)
+}
+
+/**
+ * Directly under that captain's own name, so there is no ambiguity about
+ * whose initials belong where.
+ */
+function drawInitials(page: PDFPage, initials: BoxRect, fonts: Fonts) {
     drawBox(page, initials, 0.9, BLACK)
     page.drawText("Captain initial to confirm score", {
         x: initials.x + initials.w + 5,
@@ -662,7 +744,8 @@ export async function renderScoreSheetsPdf(
 
     const fonts: Fonts = {
         regular: await doc.embedFont(StandardFonts.Helvetica),
-        bold: await doc.embedFont(StandardFonts.HelveticaBold)
+        bold: await doc.embedFont(StandardFonts.HelveticaBold),
+        hand: await doc.embedFont(StandardFonts.HelveticaOblique)
     }
 
     // The link QR is identical on every page, so it is embedded once and

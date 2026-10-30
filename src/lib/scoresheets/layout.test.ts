@@ -1,3 +1,4 @@
+import { PDFDocument, StandardFonts } from "pdf-lib"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -6,6 +7,7 @@ import {
     PAGE_HEIGHT,
     PAGE_WIDTH
 } from "./layout"
+import { FILL_INSTRUCTION, ruleLines } from "./sheet-config"
 import type { CourtSheet, SheetEventType, SheetMatch } from "./types"
 
 function team(name: string) {
@@ -349,5 +351,70 @@ describe("buildSheetGeometry", () => {
 
         const four = buildSheetGeometry(courtSheet(4, true), "playoff")
         expect(four.blocks[0].h).toBeLessThan(150)
+    })
+})
+
+describe("the worked FINAL example", () => {
+    it("leaves every rules line room to end before it", async () => {
+        // Measured with the fonts and sizes render.ts sets them in: the
+        // instruction bold at 9, the rules regular at 9.5.
+        const doc = await PDFDocument.create()
+        const regular = await doc.embedFont(StandardFonts.Helvetica)
+        const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+
+        for (const eventType of EVENT_TYPES) {
+            const geometry = buildSheetGeometry(courtSheet(3), eventType)
+            const { textWidth } = geometry.rules
+            expect(bold.widthOfTextAtSize(FILL_INSTRUCTION, 9)).toBeLessThan(
+                textWidth
+            )
+            for (const line of ruleLines(eventType)) {
+                expect(regular.widthOfTextAtSize(line, 9.5)).toBeLessThan(
+                    textWidth
+                )
+            }
+            expect(geometry.fillExample.frame.x).toBeGreaterThan(
+                geometry.content.left + textWidth
+            )
+        }
+    })
+
+    it("sits in the rules band, clear of the link QR and its caption", () => {
+        const geometry = buildSheetGeometry(courtSheet(4, true), "playoff")
+        const { frame, digits } = geometry.fillExample
+        const { rules, qr, content } = geometry
+
+        expect(frame.y).toBeGreaterThanOrEqual(rules.y)
+        expect(frame.y + frame.h).toBeLessThanOrEqual(rules.y + rules.h)
+        expect(frame.x + frame.w).toBeLessThanOrEqual(content.right)
+        // The caption hangs about 9pt under the QR.
+        expect(frame.y + frame.h).toBeLessThan(qr.y - 9 - 1)
+        for (const digit of digits) {
+            expect(digit.x).toBeGreaterThan(frame.x)
+            expect(digit.x + digit.w).toBeLessThan(frame.x + frame.w)
+            expect(digit.y).toBeGreaterThan(frame.y)
+            expect(digit.y + digit.h).toBeLessThan(frame.y + frame.h)
+        }
+        expect(overlaps(digits[0], digits[1])).toBe(false)
+    })
+})
+
+describe("the write-in line for a team not yet known", () => {
+    it("runs along the name's baseline, above the slot label", () => {
+        const geometry = buildSheetGeometry(courtSheet(4, true), "playoff")
+        for (const block of geometry.blocks) {
+            for (const row of block.rows) {
+                const { writeIn, nameBaselineY, captainBaselineY, initials } =
+                    row.label
+                expect(writeIn.y).toBeLessThan(nameBaselineY)
+                // Clears the 9pt slot label printed on the captain line.
+                expect(writeIn.y).toBeGreaterThan(captainBaselineY + 9)
+                expect(writeIn.y).toBeGreaterThan(initials.y + initials.h)
+                expect(writeIn.x).toBe(block.labelColumn.x)
+                expect(writeIn.x + writeIn.w).toBeLessThan(
+                    block.labelColumn.x + block.labelColumn.w
+                )
+            }
+        }
     })
 })

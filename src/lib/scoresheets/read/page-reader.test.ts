@@ -82,7 +82,7 @@ describe("createGatewayPageReader", () => {
         const content = body.messages[0].content
         expect(content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/)
         expect(content[0].text).toContain(
-            'MATCH #2: top team "Team Pham", bottom team "Team Stafford"'
+            'Block 2, printed MATCH #2: top team "Team Pham", bottom team "Team Stafford"'
         )
     })
 
@@ -126,6 +126,25 @@ describe("pagePrompt", () => {
         const playoff = pagePrompt(MATCHES, "playoff")
         expect(playoff).toContain("starts at 4-4")
         expect(playoff).toContain("game 3: to 25, no cap")
+    })
+
+    it("numbers blocks by position, however they are printed", () => {
+        // Playoff blocks print their bracket number, so the top block of a
+        // court may read "MATCH #6"; the reply must still say match 1.
+        const prompt = pagePrompt(
+            [
+                { home: "Team Gomez", away: "Team Collazo", number: 6 },
+                { home: "Team Pham", away: "Winner of M6", number: 8 }
+            ],
+            "playoff"
+        )
+        expect(prompt).toContain(
+            'Block 1, printed MATCH #6: top team "Team Gomez"'
+        )
+        expect(prompt).toContain(
+            'Block 2, printed MATCH #8: top team "Team Pham"'
+        )
+        expect(prompt).toContain("not its printed number")
     })
 
     it("tells the reader the rules are not evidence", () => {

@@ -124,6 +124,7 @@ describe("readSheet", () => {
                 matchId: 201,
                 home: "Team Gomez",
                 away: "Team Collazo",
+                number: 6,
                 bracket: {
                     division: "ABA",
                     matchNum: 6,
@@ -135,6 +136,7 @@ describe("readSheet", () => {
                 matchId: 202,
                 home: "Team Pham",
                 away: "Winner of M6",
+                number: 8,
                 bracket: {
                     division: "ABA",
                     matchNum: 8,
@@ -180,7 +182,7 @@ describe("readSheet", () => {
         expect(read.status).toBe("needs_review")
         expect(read.problems).toEqual([
             expect.stringMatching(
-                /^Match 1: The referee wrote "Team Collazo" into match 2 as the winner of M6, but these scores make Team Gomez the winner/
+                /^Match 6: The referee wrote "Team Collazo" into match 8 as the winner of M6, but these scores make Team Gomez the winner/
             )
         ])
     })

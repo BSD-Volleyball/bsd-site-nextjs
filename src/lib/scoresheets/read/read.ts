@@ -47,6 +47,8 @@ export interface SheetMatchInput {
     /** As printed: the top row of the block. */
     home: string
     away: string
+    /** The number printed on the block ("MATCH #6"); its position if absent. */
+    number?: number
     /** Playoffs only, for checking who the referee wrote into each slot. */
     bracket?: MatchBracket
 }
@@ -155,9 +157,10 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
         const match = matches[matchIndex]
         match.problems = [...match.problems, problem]
     }
-    for (const match of matches) {
+    for (const [index, match] of matches.entries()) {
+        const number = input.matches[index].number ?? match.orderOnCourt
         for (const problem of match.problems) {
-            problems.push(`Match ${match.orderOnCourt}: ${problem}`)
+            problems.push(`Match ${number}: ${problem}`)
         }
     }
 

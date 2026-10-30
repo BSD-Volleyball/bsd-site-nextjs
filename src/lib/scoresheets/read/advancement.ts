@@ -37,6 +37,8 @@ export interface MatchBracket {
 export interface AdvancementMatch {
     home: string
     away: string
+    /** The number printed on the block; its position if absent. */
+    number?: number
     bracket?: MatchBracket
 }
 
@@ -124,7 +126,7 @@ export function advancementProblems(
                 if (named === null || named === sent) continue
                 problems.push({
                     matchIndex: fromIndex,
-                    problem: `The referee wrote "${written.slice(0, 40)}" into match ${index + 1} as the ${source.kind} of M${source.matchNum}, but these scores make ${from[sent]} the ${source.kind}. Check this match's scores against the photo.`
+                    problem: `The referee wrote "${written.slice(0, 40)}" into match ${match.number ?? index + 1} as the ${source.kind} of M${source.matchNum}, but these scores make ${from[sent]} the ${source.kind}. Check this match's scores against the photo.`
                 })
                 break
             }

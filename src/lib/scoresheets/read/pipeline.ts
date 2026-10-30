@@ -17,7 +17,7 @@ import { getR2Object } from "@/lib/r2"
 
 import { findScoreSheetPrint, type ScoreSheetPrint } from "../prints"
 import { loadScoreSheetNight } from "../load"
-import { sheetCode, sheetTag } from "../sheet-config"
+import { printedMatchNumber, sheetCode, sheetTag } from "../sheet-config"
 import type { SheetEventType, SheetNight } from "../types"
 import { decodeJpeg } from "./image"
 import {
@@ -184,6 +184,7 @@ async function resolveLayout(
             matchId,
             home: match?.home.name ?? "(unknown team)",
             away: match?.away.name ?? "(unknown team)",
+            number: match ? printedMatchNumber(match) : undefined,
             bracket:
                 match && match.playoffMatchNum !== null
                     ? {

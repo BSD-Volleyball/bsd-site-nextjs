@@ -67,6 +67,15 @@ const CONTENT_TOP = PAGE_HEIGHT - FIDUCIAL_CLEAR
 const HEADER_HEIGHT = 92
 /** Three lines of rules, set large enough to read on paper. */
 const RULES_HEIGHT = 44
+/**
+ * The worked example of the FINAL boxes, at the right-hand end of the rules
+ * band. The rule text stops short of it, so every line printed there must fit
+ * `rules.textWidth`; the layout test measures them.
+ */
+const FILL_EXAMPLE_WIDTH = 80
+const FILL_EXAMPLE_GAP = 10
+/** A little larger than the real boxes, so the example reads at a glance. */
+const EXAMPLE_DIGIT_BOX = 16
 /** Strip carrying the GAME 1/2/3 column headings, printed once per page. */
 const GAME_HEADING_HEIGHT = 11
 /** The stylized link QR, identical on every sheet. */
@@ -155,6 +164,12 @@ interface TeamLabelGeometry {
     captainBaselineY: number
     /** The box that captain initials in. */
     initials: BoxRect
+    /**
+     * Where the team name is written by hand when it was not known at print
+     * time (a "Winner of M6" slot): a line on the name's baseline, with the
+     * slot printed beneath it where a captain's name would go.
+     */
+    writeIn: { x: number; y: number; w: number }
 }
 
 export interface TeamRowGeometry {
@@ -213,6 +228,11 @@ function labelGroup(rowY: number, rowH: number): TeamLabelGeometry {
             y: captainBaselineY - INITIALS_GAP - INITIALS_BOX_H,
             w: INITIALS_BOX_W,
             h: INITIALS_BOX_H
+        },
+        writeIn: {
+            x: CONTENT_LEFT,
+            y: nameBaselineY - 1.5,
+            w: LABEL_COLUMN_WIDTH - 12
         }
     }
 }
@@ -228,7 +248,10 @@ export interface SheetGeometry {
     tagQr: BoxRect
     content: { left: number; right: number; top: number; width: number }
     header: { y: number; h: number }
-    rules: { y: number; h: number }
+    /** `textWidth`: how far a rules line may run before the example. */
+    rules: { y: number; h: number; textWidth: number }
+    /** Two FINAL boxes filled in with `FILL_EXAMPLE`, beside the rules. */
+    fillExample: { frame: BoxRect; digits: [BoxRect, BoxRect] }
     /** Column headings shared by every block, since the columns never move. */
     gameHeadings: { y: number; h: number; columns: GameColumn[] }
     refNotes: BoxRect
@@ -328,6 +351,35 @@ export function buildSheetGeometry(
 ): SheetGeometry {
     const headerY = CONTENT_TOP - HEADER_HEIGHT
     const rulesY = headerY - RULES_HEIGHT
+
+    const exampleFrame: BoxRect = {
+        x: CONTENT_RIGHT - FILL_EXAMPLE_WIDTH,
+        y: rulesY + 1,
+        w: FILL_EXAMPLE_WIDTH,
+        // Stops short of the band's top: the link QR's caption sits just above.
+        h: RULES_HEIGHT - 5
+    }
+    // The real cell's order: the FINAL label, then the two boxes, centred.
+    const exampleDigitsY =
+        exampleFrame.y + exampleFrame.h - 12 - EXAMPLE_DIGIT_BOX
+    const exampleDigit1X = exampleFrame.x + 36
+    const fillExample: SheetGeometry["fillExample"] = {
+        frame: exampleFrame,
+        digits: [
+            {
+                x: exampleDigit1X,
+                y: exampleDigitsY,
+                w: EXAMPLE_DIGIT_BOX,
+                h: EXAMPLE_DIGIT_BOX
+            },
+            {
+                x: exampleDigit1X + EXAMPLE_DIGIT_BOX + 2,
+                y: exampleDigitsY,
+                w: EXAMPLE_DIGIT_BOX,
+                h: EXAMPLE_DIGIT_BOX
+            }
+        ]
+    }
 
     // Clears the bottom corner marks, so the notes box cannot overlap one.
     const refNotesY = FIDUCIAL_CLEAR
@@ -459,7 +511,12 @@ export function buildSheetGeometry(
             width: CONTENT_WIDTH
         },
         header: { y: headerY, h: HEADER_HEIGHT },
-        rules: { y: rulesY, h: RULES_HEIGHT },
+        rules: {
+            y: rulesY,
+            h: RULES_HEIGHT,
+            textWidth: CONTENT_WIDTH - FILL_EXAMPLE_WIDTH - FILL_EXAMPLE_GAP
+        },
+        fillExample,
         gameHeadings: {
             y: headingsY,
             h: GAME_HEADING_HEIGHT,

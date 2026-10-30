@@ -10,7 +10,7 @@
  */
 
 import { getSeasonAbbreviation } from "@/lib/pdf/tryout-sheet-shared"
-import type { SheetEventType, SheetNight } from "./types"
+import type { SheetEventType, SheetMatch, SheetNight } from "./types"
 
 /**
  * Bumped whenever the printed geometry changes in a way that would break a
@@ -23,8 +23,12 @@ import type { SheetEventType, SheetNight } from "./types"
  * printable area (they were being clipped), everything set larger and in
  * black, rules cut from five lines to three, and the captain's initials box
  * moved under each captain's own name.
+ * v4: playoff blocks are numbered by bracket match ("MATCH #6") rather than
+ * 1-4 down the page; a team not known at print time gets a line to write it
+ * on, with its bracket slot beneath; a worked example of the FINAL boxes sits
+ * to the right of the instructions, which were shortened to make room.
  */
-export const TEMPLATE_VERSION = 3
+export const TEMPLATE_VERSION = 4
 
 interface GameRule {
     game: 1 | 2 | 3
@@ -76,7 +80,7 @@ const REGULAR_SEASON_TEXT: string[] = [
 ]
 
 const PLAYOFF_TEXT: string[] = [
-    "RALLY SCORING — every game starts 4-4 (points 1-4 pre-marked). Two 30-second timeouts per team per game.",
+    "RALLY SCORING — games start 4-4 (points 1-4 pre-marked). Two 30-second timeouts per team per game.",
     "Games 1 & 2: play to 25, win by 2, 30-point cap. Game 3: to 25, win by 2, NO cap, switch sides at 15.",
     "Warm up before the previous match ends. Work team is 4: scorer, two line judges, down ref."
 ]
@@ -92,11 +96,31 @@ export function ruleLines(eventType: SheetEventType): string[] {
  *
  * "Write the FINAL score, one digit per box" was read on 2026-10-08 by two
  * referees of six as "our score | their score", so each team's row held both
- * numbers and no reader could tell them apart. Hence the definition and the
- * worked example. One line only: the rules box has no room for a second.
+ * numbers and no reader could tell them apart. Hence the definition, and
+ * beside it a drawn example of two filled boxes (`FILL_EXAMPLE`), which
+ * replaced a "(25 = 2|5)" some scorekeepers still read past. One line only:
+ * the rules box has no room for a second.
  */
 export const FILL_INSTRUCTION =
-    "Slash each point as scored. FINAL = that team's OWN score, one digit per box (25 = 2|5). Tick WIN for the winner."
+    "Slash each point as scored. FINAL = that team's OWN score, one digit per box. Tick WIN for the winner."
+
+/** The score written into the example FINAL boxes beside the instructions. */
+export const FILL_EXAMPLE = "25"
+
+/**
+ * The number printed on a match block. Playoff blocks carry their bracket
+ * number, so "Winner of M6" on one court points at the block printed
+ * "MATCH #6", wherever it is played; numbering them 1-4 down each page gave
+ * every court a second, conflicting "MATCH #1". Regular season has no
+ * bracket and counts down the page.
+ */
+export function printedMatchNumber(
+    match: Pick<SheetMatch, "orderOnCourt" | "playoff" | "playoffMatchNum">
+): number {
+    return match.playoff && match.playoffMatchNum !== null
+        ? match.playoffMatchNum
+        : match.orderOnCourt
+}
 
 /** "fall" + 2026 -> "F26". */
 export function seasonCodeFor(seasonName: string, year: number): string {

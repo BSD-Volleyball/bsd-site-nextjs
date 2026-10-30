@@ -271,9 +271,108 @@ describe("loadScoreSheetNight", () => {
         expect(loaded?.home.name).toBe("Top Seed")
         expect(loaded?.away.name).toBe("Winner of M1")
         expect(loaded?.away.isPlaceholder).toBe(true)
+        expect(loaded?.away.source).toEqual({ kind: "winner", matchNum: 1 })
         expect(loaded?.away.captains).toEqual([])
         expect(loaded?.playoffMatchNum).toBe(2)
         expect(loaded?.workTeam).toBe("Bench Crew")
+    })
+
+    it("names a work team decided in an earlier week, not its bracket label", async () => {
+        // 2026-10-29: every court's first match was worked by "Winner of M4",
+        // decided the week before, yet the sheet printed the label because
+        // nothing writes that team into work_team.
+        const season = await createSeason({ phase: "in_season" })
+        const division = await createDivision({ name: "ABA", level: 3 })
+        await createSeasonEvent(season.id, {
+            event_type: "playoff",
+            event_date: NIGHT,
+            sort_order: 0
+        })
+        const captain = await createUser()
+        const [winner, loser, home, away] = await Promise.all(
+            ["Team Lukens", "Team Pham", "Team Gomez", "Team Collazo"].map(
+                (name, i) =>
+                    createTeam({
+                        season: season.id,
+                        captain: captain.id,
+                        division: division.id,
+                        name,
+                        number: i + 1
+                    })
+            )
+        )
+
+        const lastWeek = await createMatch({
+            season: season.id,
+            division: division.id,
+            date: "2026-09-28",
+            time: "19:00:00",
+            court: 4,
+            playoff: true,
+            home_team: loser.id,
+            away_team: winner.id,
+            home_score: 0,
+            away_score: 2,
+            home_set1_score: 20,
+            away_set1_score: 25,
+            home_set2_score: 22,
+            away_set2_score: 25,
+            winner: winner.id
+        })
+        const first = await createMatch({
+            season: season.id,
+            division: division.id,
+            week: 2,
+            date: NIGHT,
+            time: "19:00:00",
+            court: 4,
+            playoff: true,
+            home_team: home.id,
+            away_team: away.id
+        })
+        const second = await createMatch({
+            season: season.id,
+            division: division.id,
+            week: 2,
+            date: NIGHT,
+            time: "19:50:00",
+            court: 4,
+            playoff: true,
+            home_team: null,
+            away_team: null
+        })
+        const meta = (
+            matchId: number,
+            matchNum: number,
+            workSource: string,
+            sources: [string, string]
+        ) => ({
+            season: season.id,
+            division: division.id,
+            week: matchNum === 4 ? 1 : 2,
+            match_num: matchNum,
+            match_id: matchId,
+            bracket: "winners",
+            home_source: sources[0],
+            away_source: sources[1],
+            work_team: null,
+            work_source: workSource
+        })
+        await db
+            .insert(playoffMatchesMeta)
+            .values([
+                meta(lastWeek.id, 4, "S1", ["S3", "S4"]),
+                meta(first.id, 6, "W4", ["S1", "S2"]),
+                meta(second.id, 8, "L6", ["W5", "W6"])
+            ])
+
+        logout()
+        const night = await loadScoreSheetNight(season.id, NIGHT)
+        const [m6, m8] = night?.courts[0].matches ?? []
+
+        expect(m6?.workTeam).toBe("Team Lukens")
+        // Played later the same night, so still only a label.
+        expect(m8?.workTeam).toBe("Loser of M6")
     })
 
     it("puts matches with no court on a trailing sheet", async () => {

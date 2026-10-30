@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
     FIRST_MATCH_GRACE_MINUTES,
     gameRules,
+    printedMatchNumber,
     ruleLines,
     seasonCodeFor,
     sheetCode,
@@ -145,5 +146,35 @@ describe("startNote", () => {
 
     it("says nothing when a first match has no scheduled time", () => {
         expect(startNote(aa(null), null)).toBeNull()
+    })
+})
+
+describe("printedMatchNumber", () => {
+    it("numbers a playoff block by its bracket match", () => {
+        expect(
+            printedMatchNumber({
+                orderOnCourt: 1,
+                playoff: true,
+                playoffMatchNum: 6
+            })
+        ).toBe(6)
+    })
+
+    it("counts down the page when there is no bracket", () => {
+        expect(
+            printedMatchNumber({
+                orderOnCourt: 2,
+                playoff: false,
+                playoffMatchNum: null
+            })
+        ).toBe(2)
+        // A playoff match with no bracket row still gets a number.
+        expect(
+            printedMatchNumber({
+                orderOnCourt: 3,
+                playoff: true,
+                playoffMatchNum: null
+            })
+        ).toBe(3)
     })
 })
