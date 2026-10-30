@@ -419,8 +419,15 @@ function drawMatchHeader(
     page.drawText("REF:", { x, y, size: 8, font: fonts.bold, color: GREY })
     x += fonts.bold.widthOfTextAtSize("REF:", 8) + 4
 
-    // Whatever the note and id left over, shared by ref / backup / work.
-    const remaining = Math.max(middleEdge - x, 0)
+    // The work team starts where game 2's numbers do, on every block, so it
+    // does not shift with the width of the start-time note beside it. The
+    // referee and backup share what lies to its left.
+    const workX = block.gameColumns[1].x
+    const leftEdge = match.workTeam
+        ? Math.min(middleEdge, workX - 8)
+        : middleEdge
+
+    const remaining = Math.max(leftEdge - x, 0)
     const refWidth = Math.min(remaining, 100)
     const refName = match.referee ?? ""
     if (refName) {
@@ -438,36 +445,18 @@ function drawMatchHeader(
     }
     x += refWidth + 8
 
-    // The work team outranks the backup referee for the remaining space: on a
-    // playoff night four people have to know they are working this match,
-    // whereas the backup is a name the primary already knows. Reserve the
-    // work team's width first so it can never be squeezed to an ellipsis.
-    let backupEdge = middleEdge
-    if (match.workTeam) {
-        const label = `WORK: ${match.workTeam}`
-        const width = fonts.bold.widthOfTextAtSize(label, 8)
-        if (middleEdge - x >= width) {
-            page.drawText(label, {
-                x: middleEdge - width,
-                y,
-                size: 8,
-                font: fonts.bold,
-                color: BLACK
-            })
-            backupEdge = middleEdge - width - 8
-        } else if (middleEdge - x > 60) {
-            page.drawText(
-                truncateToFit({
-                    text: label,
-                    maxWidth: middleEdge - x,
-                    fontSize: 8,
-                    font: fonts.bold
-                }),
-                { x, y, size: 8, font: fonts.bold, color: BLACK }
-            )
-            backupEdge = x
-        }
+    if (match.workTeam && middleEdge - workX > 40) {
+        page.drawText(
+            truncateToFit({
+                text: `WORK: ${match.workTeam}`,
+                maxWidth: middleEdge - workX,
+                fontSize: 8,
+                font: fonts.bold
+            }),
+            { x: workX, y, size: 8, font: fonts.bold, color: BLACK }
+        )
     }
+    const backupEdge = leftEdge
 
     if (match.backupReferee && backupEdge - x > 46) {
         page.drawText(
