@@ -20,7 +20,8 @@
     },
     "pnpm": {
         "overrides": {
-            "zod": "^4.6.6"
+            "zod": "^4.6.6",
+            "undici": "~7.30.1"
         },
         "onlyBuiltDependencies": [
             "workerd",
