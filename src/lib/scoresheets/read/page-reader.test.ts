@@ -128,6 +128,20 @@ describe("pagePrompt", () => {
         expect(playoff).toContain("game 3: to 25, no cap")
     })
 
+    it("tells the reader the rules are not evidence", () => {
+        // gemini-4-argon reported a 27-26 the referee wrote as 27-25, citing
+        // win by 2 (2026-10-22, Iyer v Yang); the paper is what gets reported.
+        expect(pagePrompt(MATCHES, "playoff")).toContain(
+            "Never change a number to make a score legal"
+        )
+    })
+
+    it("asks for the names written into bracket slots", () => {
+        const prompt = pagePrompt(MATCHES, "playoff")
+        expect(prompt).toContain("writtenTop and writtenBottom")
+        expect(prompt).toContain("Never copy a printed name")
+    })
+
     it("tells the reader a lone stroke is a 1", () => {
         // A referee's "11" written as two vertical lines was read as empty
         // boxes by every model until it was told (2026-10-01, Iyer v Kafer).
@@ -138,6 +152,18 @@ describe("pagePrompt", () => {
 })
 
 describe("parseReply", () => {
+    it("keeps the names written beside each row, trimmed", () => {
+        const named = structuredClone(GOOD_REPLY) as typeof GOOD_REPLY & {
+            matches: { writtenTop?: string | null; writtenBottom?: string }[]
+        }
+        named.matches[1].writtenTop = null
+        named.matches[1].writtenBottom = "  Team Collazo "
+        expect(parseReply("m", named, 2).writtenNames).toEqual([
+            { home: null, away: null },
+            { home: null, away: "Team Collazo" }
+        ])
+    })
+
     it("refuses a reply that leaves out a match", () => {
         const short = { ...GOOD_REPLY, matches: [GOOD_REPLY.matches[0]] }
         expect(() => parseReply("m", short, 2)).toThrow(/left out match 2/)

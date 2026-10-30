@@ -38,12 +38,18 @@ import type {
 const UNKNOWN_TEAM = "TBD"
 
 function placeholderTeam(sourceToken: string | null): SheetTeam {
-    const label = formatSourceHumanLabel(parseSourceToken(sourceToken))
+    const parsed = parseSourceToken(sourceToken)
+    const label = formatSourceHumanLabel(parsed)
     return {
         teamId: null,
         name: label ?? UNKNOWN_TEAM,
         isPlaceholder: true,
-        captains: []
+        captains: [],
+        source:
+            (parsed.kind === "winner" || parsed.kind === "loser") &&
+            parsed.value !== null
+                ? { kind: parsed.kind, matchNum: parsed.value }
+                : null
     }
 }
 

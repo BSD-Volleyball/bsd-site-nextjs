@@ -12,6 +12,7 @@
  */
 
 import type { SheetEventType } from "../types"
+import { advancementProblems, type MatchBracket } from "./advancement"
 import { combineReadings, type MatchVerdict } from "./combine"
 import type { SheetTagParts } from "./identity"
 import type { PageReader, PageReading } from "./page-reader"
@@ -46,6 +47,8 @@ export interface SheetMatchInput {
     /** As printed: the top row of the block. */
     home: string
     away: string
+    /** Playoffs only, for checking who the referee wrote into each slot. */
+    bracket?: MatchBracket
 }
 
 interface ReadInput {
@@ -143,6 +146,15 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
         matchId: input.matches[index].matchId,
         orderOnCourt: index + 1
     }))
+    const advancement = advancementProblems(
+        input.matches,
+        matches.map((m) => m.winner),
+        readings
+    )
+    for (const { matchIndex, problem } of advancement) {
+        const match = matches[matchIndex]
+        match.problems = [...match.problems, problem]
+    }
     for (const match of matches) {
         for (const problem of match.problems) {
             problems.push(`Match ${match.orderOnCourt}: ${problem}`)

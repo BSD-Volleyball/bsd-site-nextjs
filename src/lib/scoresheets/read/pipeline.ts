@@ -183,7 +183,22 @@ async function resolveLayout(
         return {
             matchId,
             home: match?.home.name ?? "(unknown team)",
-            away: match?.away.name ?? "(unknown team)"
+            away: match?.away.name ?? "(unknown team)",
+            bracket:
+                match && match.playoffMatchNum !== null
+                    ? {
+                          division: match.divisionName,
+                          matchNum: match.playoffMatchNum,
+                          home: {
+                              captains: match.home.captains,
+                              source: match.home.source ?? null
+                          },
+                          away: {
+                              captains: match.away.captains,
+                              source: match.away.source ?? null
+                          }
+                      }
+                    : undefined
         }
     })
 

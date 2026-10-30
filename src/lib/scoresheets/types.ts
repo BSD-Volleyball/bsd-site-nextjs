@@ -11,6 +11,13 @@
 
 export type SheetEventType = "regular_season" | "playoff"
 
+/** The bracket match a "Winner of M6" / "Loser of M6" slot is filled from. */
+export interface BracketSource {
+    kind: "winner" | "loser"
+    /** Bracket match number, unique within one division's bracket. */
+    matchNum: number
+}
+
 export interface SheetTeam {
     /** null when a playoff slot has no winner yet. */
     teamId: number | null
@@ -19,6 +26,8 @@ export interface SheetTeam {
     isPlaceholder: boolean
     /** Captain and co-captain display names; 0-2 entries. */
     captains: string[]
+    /** Set on a placeholder filled by another match's winner or loser. */
+    source?: BracketSource | null
 }
 
 export interface SheetMatch {

@@ -56,12 +56,23 @@ export interface GameReading {
     note: string
 }
 
+/**
+ * A team name the referee wrote beside a row, for each side of one match.
+ * Only rows printed as a bracket slot ("Winner of M6") are ever checked.
+ */
+export interface WrittenNames {
+    home: string | null
+    away: string | null
+}
+
 export interface PageReading {
     model: string
     /** The printed code beside the small QR, e.g. "F26-W4-C3", if legible. */
     sheetCode: string | null
     /** One entry per match in printed order, each with three games. */
     matches: GameReading[][]
+    /** One entry per match in printed order; absent from older reads. */
+    writtenNames?: WrittenNames[]
 }
 
 export interface PageReader {
@@ -88,6 +99,8 @@ const ReplySchema = z.object({
     matches: z.array(
         z.object({
             match: z.number().int(),
+            writtenTop: z.string().nullable().optional(),
+            writtenBottom: z.string().nullable().optional(),
             games: z.array(
                 z.object({
                     game: z.number().int(),
@@ -113,9 +126,11 @@ const REPLY_JSON_SCHEMA = {
             items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["match", "games"],
+                required: ["match", "writtenTop", "writtenBottom", "games"],
                 properties: {
                     match: { type: "integer" },
+                    writtenTop: { type: ["string", "null"] },
+                    writtenBottom: { type: ["string", "null"] },
                     games: {
                         type: "array",
                         items: {
@@ -190,7 +205,10 @@ export function pagePrompt(
         ),
         "",
         "For every game, report each team's final points. Use all the evidence on the page: the FINAL digits, where the tally marks stop or what number is circled, and the WIN ticks. They usually agree; when they disagree, work out what actually happened. Referees sometimes make mistakes, such as writing both teams' scores into one team's FINAL boxes, writing a correction outside the boxes, or ticking the wrong WIN box and crossing it out.",
+        "The rules above say what a legal final looks like; they are not evidence of what was written. Report the score the referee recorded even when it breaks a rule, such as 25-24 in a game won by 2. Never change a number to make a score legal: lower confidence and say what is wrong in note instead.",
         'Referees often write a 1 as a single vertical stroke. A FINAL box holding only a vertical line is a 1, not an empty box, so two boxes with a line in each read "11".',
+        "",
+        'Some rows are printed as a bracket slot, such as "Winner of M6", instead of a team. Referees often handwrite the team that filled the slot beside it, by team name or captain name. For every match report writtenTop and writtenBottom: that handwritten name exactly as written, or null when nothing is handwritten beside the row. Never copy a printed name.',
         "",
         "Also report sheetCode: the short code printed above the small QR code in the bottom-right corner (like F26-W4-C3), or null if you cannot read it.",
         "Give all three games for every match, numbered as printed. Use null for both teams when a game was not played. confidence is high only when every piece of evidence agrees and the writing is clear. Keep note short, and empty when there is nothing to say.",
@@ -246,11 +264,16 @@ export function parseReply(
     }
 
     const matches: GameReading[][] = []
+    const writtenNames: WrittenNames[] = []
     for (let m = 1; m <= matchCount; m++) {
         const entry = parsed.data.matches.find((x) => x.match === m)
         if (!entry) {
             throw new PageReaderError(`The reply left out match ${m}.`)
         }
+        writtenNames.push({
+            home: entry.writtenTop?.trim() || null,
+            away: entry.writtenBottom?.trim() || null
+        })
         const games: GameReading[] = []
         for (let g = 1; g <= 3; g++) {
             const game = entry.games.find((x) => x.game === g)
@@ -275,7 +298,7 @@ export function parseReply(
     }
 
     const sheetCode = parsed.data.sheetCode?.trim() || null
-    return { model, sheetCode, matches }
+    return { model, sheetCode, matches, writtenNames }
 }
 
 interface GatewayConfig {

@@ -116,6 +116,75 @@ describe("readSheet", () => {
         )
     })
 
+    it("sends a sheet to review when a slot names the team the scores did not", async () => {
+        // 2026-10-29: Gomez 26-24 in game 3 on the paper, Collazo written into
+        // the next block's Winner of M6 slot. Both readers agree on the scores.
+        const playoff = [
+            {
+                matchId: 201,
+                home: "Team Gomez",
+                away: "Team Collazo",
+                bracket: {
+                    division: "ABA",
+                    matchNum: 6,
+                    home: { captains: [], source: null },
+                    away: { captains: [], source: null }
+                }
+            },
+            {
+                matchId: 202,
+                home: "Team Pham",
+                away: "Winner of M6",
+                bracket: {
+                    division: "ABA",
+                    matchNum: 8,
+                    home: { captains: [], source: null },
+                    away: {
+                        captains: [],
+                        source: { kind: "winner" as const, matchNum: 6 }
+                    }
+                }
+            }
+        ]
+        const reader = (name: string): PageReader => ({
+            name,
+            async read() {
+                return {
+                    model: name,
+                    sheetCode: "F26-P2-C4",
+                    matches: [
+                        [g(19, 25), g(25, 19), g(26, 24)],
+                        [g(25, 20), g(25, 22), g(null, null)]
+                    ],
+                    writtenNames: [
+                        { home: null, away: null },
+                        { home: null, away: "Team Collazo" }
+                    ]
+                }
+            },
+            async readCode() {
+                return "F26-P2-C4"
+            }
+        })
+
+        const read = await readSheet({
+            ...input([reader("a/one"), reader("b/two")]),
+            matches: playoff,
+            eventType: "playoff",
+            expectedSheetCode: "F26-P2-C4"
+        })
+
+        expect(read.matches[0].games.every((x) => x.level === "high")).toBe(
+            true
+        )
+        expect(read.status).toBe("needs_review")
+        expect(read.problems).toEqual([
+            expect.stringMatching(
+                /^Match 1: The referee wrote "Team Collazo" into match 2 as the winner of M6, but these scores make Team Gomez the winner/
+            )
+        ])
+    })
+
     it("needs no secret to run: with no readers it asks for typing", async () => {
         const read = await readSheet(input([]))
         expect(read.status).toBe("needs_review")
