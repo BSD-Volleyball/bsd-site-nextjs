@@ -418,6 +418,8 @@ export interface GameReminderItem {
     matchNum: number | null
     /** e.g. "If you win match 1"; null when the match is certain. */
     condition: string | null
+    /** The match may not be played at all: "Match #11 (if needed)". */
+    ifNeeded?: boolean
     /** One-night subs only: who they cover, e.g. "Casey Covered (Home Heroes)". */
     subFor?: string
 }
@@ -438,7 +440,7 @@ function renderGameReminderItem(
                       : item.role === "work"
                         ? "Work:"
                         : "Match:",
-                  `Match #${item.matchNum}`
+                  `Match #${item.matchNum}${item.ifNeeded ? " (if needed)" : ""}`
               )
             : "",
         renderDetailRow("Time:", item.timeLabel),

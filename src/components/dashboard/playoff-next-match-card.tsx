@@ -96,6 +96,7 @@ export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
                                 </Badge>
                                 <span className="font-semibold text-blue-800 dark:text-blue-200">
                                     Match #{item.matchNum}
+                                    {item.ifNeeded && " (if needed)"}
                                 </span>
                                 <span className="ml-auto text-blue-700 text-sm dark:text-blue-300">
                                     {item.time ?? "TBD"}

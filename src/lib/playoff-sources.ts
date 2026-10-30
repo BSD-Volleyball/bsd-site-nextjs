@@ -122,6 +122,39 @@ export function isWinnerLoserReset(
     return isPair && home.value === away.value
 }
 
+/**
+ * For a reset final (Winner of M10 vs Loser of M10): which side of the first
+ * final arrives unbeaten, built only from seeds and winners, never a loser.
+ * The reset is played only if the OTHER side wins the first final. null when
+ * the match is not a reset, or the bracket does not tell the sides apart.
+ */
+export function resetFinalUnbeatenSide(
+    home: ParsedSource,
+    away: ParsedSource,
+    matchByNum: Map<number, BracketMatchRef>
+): { firstMatchNum: number; unbeaten: "home" | "away" } | null {
+    if (!isWinnerLoserReset(home, away) || home.value === null) return null
+    const first = matchByNum.get(home.value)
+    if (!first) return null
+    const isUnbeaten = (source: ParsedSource, seen: Set<number>): boolean => {
+        if (source.kind === "seed" || source.kind === "team") return true
+        if (source.kind !== "winner" || source.value === null) return false
+        if (seen.has(source.value)) return false
+        const m = matchByNum.get(source.value)
+        if (!m) return false
+        const next = new Set(seen).add(source.value)
+        return isUnbeaten(m.homeSource, next) && isUnbeaten(m.awaySource, next)
+    }
+    const seen = new Set([home.value])
+    const homeUnbeaten = isUnbeaten(first.homeSource, seen)
+    const awayUnbeaten = isUnbeaten(first.awaySource, seen)
+    if (homeUnbeaten === awayUnbeaten) return null
+    return {
+        firstMatchNum: home.value,
+        unbeaten: homeUnbeaten ? "home" : "away"
+    }
+}
+
 interface ResolveContext {
     seedToTeamId: Map<number, number>
     winnerByMatchNum: Map<number, number>

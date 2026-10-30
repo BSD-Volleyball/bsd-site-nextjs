@@ -585,7 +585,7 @@ export async function getPlayerSchedule(
                 label:
                     item.role === "play"
                         ? `Playoffs Week ${item.week} vs ${item.opponentLabel ?? "TBD"} (${playoff.divisionName})`
-                        : `Playoff work duty (Week ${item.week}, ${playoff.divisionName})`,
+                        : `Playoff work duty${item.ifNeeded ? " if needed" : ""} (Week ${item.week}, ${playoff.divisionName})`,
                 sublabel: item.condition
             }
             if (item.role === "play") schedule.games.push(entry)

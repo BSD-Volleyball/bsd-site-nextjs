@@ -269,20 +269,25 @@ describe("teamItemsForNode on the if-necessary final", () => {
                 })
             })
         )
-    const final2 = (ctx: ResolutionContext, teamId: number) =>
+    const final2Items = (ctx: ResolutionContext, teamId: number) =>
         teamItemsForNode(
             ctx.nodeByMatchNum.get(7) as PlayoffNode,
             teamId,
             ctx,
             labels
-        ).filter((item) => item.role === "play")
+        )
+    const final2 = (ctx: ResolutionContext, teamId: number) =>
+        final2Items(ctx, teamId).filter((item) => item.role === "play")
+    const final2Work = (ctx: ResolutionContext, teamId: number) =>
+        final2Items(ctx, teamId).filter((item) => item.role === "work")
 
     it("tells the unbeaten team it plays again only if it loses", () => {
         expect(final2(bracket(), 101)).toEqual([
             {
                 role: "play",
                 condition: "If you lose match 6",
-                opponentLabel: "Winner of #5"
+                opponentLabel: "Winner of #5",
+                ifNeeded: false
             }
         ])
     })
@@ -292,7 +297,8 @@ describe("teamItemsForNode on the if-necessary final", () => {
             {
                 role: "play",
                 condition: "If you win match 5 and win match 6",
-                opponentLabel: "#1 Aces"
+                opponentLabel: "#1 Aces",
+                ifNeeded: false
             }
         ])
     })
@@ -306,10 +312,53 @@ describe("teamItemsForNode on the if-necessary final", () => {
     it("keeps the match for both finalists once it is needed", () => {
         const ctx = bracket({ 5: [102, 103], 6: [102, 101] })
         expect(final2(ctx, 101)).toEqual([
-            { role: "play", condition: null, opponentLabel: "#2 Blockers" }
+            {
+                role: "play",
+                condition: null,
+                opponentLabel: "#2 Blockers",
+                ifNeeded: false
+            }
         ])
         expect(final2(ctx, 102)).toEqual([
-            { role: "play", condition: null, opponentLabel: "#1 Aces" }
+            {
+                role: "play",
+                condition: null,
+                opponentLabel: "#1 Aces",
+                ifNeeded: false
+            }
+        ])
+    })
+
+    it("marks the work duty as if needed until the first final is decided", () => {
+        expect(final2Work(bracket(), 103)).toEqual([
+            {
+                role: "work",
+                condition: "If you lose match 5",
+                opponentLabel: null,
+                ifNeeded: true
+            }
+        ])
+        expect(final2Work(bracket({ 5: [102, 103] }), 103)).toEqual([
+            {
+                role: "work",
+                condition: null,
+                opponentLabel: null,
+                ifNeeded: true
+            }
+        ])
+    })
+
+    it("settles the work duty once the first final is decided", () => {
+        const notNeeded = bracket({ 5: [102, 103], 6: [101, 102] })
+        expect(final2Work(notNeeded, 103)).toEqual([])
+        const needed = bracket({ 5: [102, 103], 6: [102, 101] })
+        expect(final2Work(needed, 103)).toEqual([
+            {
+                role: "work",
+                condition: null,
+                opponentLabel: null,
+                ifNeeded: false
+            }
         ])
     })
 })

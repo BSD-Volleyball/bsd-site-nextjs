@@ -56,6 +56,8 @@ export interface PlayoffNextMatchItem {
     opponentLabel: string | null
     isUnavailable: boolean
     condition: string | null
+    /** The match may not be played at all: "Match #11 (if needed)". */
+    ifNeeded: boolean
 }
 
 export interface PlayoffNextMatchData {
@@ -208,7 +210,8 @@ export async function getPlayoffNextMatches(
                     court: slot?.court ?? null,
                     opponentLabel: item.opponentLabel,
                     isUnavailable: item.role === "play" && isUnavailable,
-                    condition: item.condition
+                    condition: item.condition,
+                    ifNeeded: item.ifNeeded
                 })
             }
         }

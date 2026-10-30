@@ -75,6 +75,8 @@ interface TeamNightItem {
     matchupLabel: string
     matchNum: number | null
     condition: string | null
+    /** The match may not be played at all: "Match #11 (if needed)". */
+    ifNeeded?: boolean
     /** One-night subs only: "Casey Covered (Home Heroes)". */
     subFor?: string
 }
@@ -102,6 +104,7 @@ function toEmailItem(item: TeamNightItem): GameReminderItem {
         matchupLabel: item.matchupLabel,
         matchNum: item.matchNum,
         condition: item.condition,
+        ifNeeded: item.ifNeeded,
         subFor: item.subFor
     }
 }
@@ -215,7 +218,8 @@ export async function sendGameRemindersForDate(
                                 ? `${label} vs ${item.opponentLabel ?? "TBD"} (${divisionName})`
                                 : `${home} vs ${away} (${divisionName})`,
                         matchNum: node.matchNum,
-                        condition: item.condition
+                        condition: item.condition,
+                        ifNeeded: item.ifNeeded
                     })
                 }
             }

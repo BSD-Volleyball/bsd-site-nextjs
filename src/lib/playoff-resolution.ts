@@ -1,6 +1,8 @@
 // Source-resolution helpers shared between the playoff page action and the
 // dashboard's playoff next-match card.
 
+import { resetFinalUnbeatenSide } from "@/lib/playoff-sources"
+
 export type SourceKind =
     | "none"
     | "seed"
@@ -219,93 +221,85 @@ export interface TeamNodeItem {
     condition: string | null
     // Play rows only: the other side, e.g. "#2 Spikers" or "Winner of #3".
     opponentLabel: string | null
-}
-
-// True when every team this source can resolve to arrives without a loss:
-// it is built only from seeds and winners, never from a loser.
-function sourceIsUnbeaten(
-    source: ParsedSource,
-    ctx: ResolutionContext,
-    seenMatchNums: Set<number> = new Set()
-): boolean {
-    if (source.kind === "seed" || source.kind === "team") return true
-    if (source.kind !== "winner" || source.value === null) return false
-    if (seenMatchNums.has(source.value)) return false
-    const node = ctx.nodeByMatchNum.get(source.value)
-    if (!node) return false
-    const nextSeen = new Set(seenMatchNums)
-    nextSeen.add(source.value)
-    return (
-        sourceIsUnbeaten(node.homeSource, ctx, nextSeen) &&
-        sourceIsUnbeaten(node.awaySource, ctx, nextSeen)
-    )
+    // True for a match that may not be played at all (the if-necessary
+    // final before the first final is decided) when the condition does not
+    // already say so: shown as "Match #11 (if needed)".
+    ifNeeded: boolean
 }
 
 // The double-elimination "if necessary" final (Winner of M10 vs Loser of M10)
 // holds both teams of the first final, but is played only if the team that
 // came through the losers bracket wins that final. So the unbeaten side plays
-// it if it LOSES the first final, the other side if it WINS. Returns null for
-// any other match, or a bracket whose unbeaten side cannot be told apart.
-function resetFinalPlay(
+// it if it LOSES the first final, the other side if it WINS.
+interface ResetFinal {
+    firstMatchNum: number
+    first: PlayoffNode
+    unbeaten: "home" | "away"
+    /** null until the first final is decided. */
+    needed: boolean | null
+}
+
+function resetFinalOf(
     node: PlayoffNode,
+    ctx: ResolutionContext
+): ResetFinal | null {
+    const reset = resetFinalUnbeatenSide(
+        node.homeSource,
+        node.awaySource,
+        ctx.nodeByMatchNum
+    )
+    const first = reset && ctx.nodeByMatchNum.get(reset.firstMatchNum)
+    if (!reset || !first) return null
+    let needed: boolean | null = null
+    if (first.winnerTeamId !== null && first.loserTeamId !== null) {
+        const winnerSide =
+            first.winnerTeamId === first.homeTeamId ? "home" : "away"
+        needed = winnerSide !== reset.unbeaten
+    }
+    return { ...reset, first, needed }
+}
+
+function resetFinalPlay(
+    reset: ResetFinal,
     teamId: number,
     ctx: ResolutionContext,
     teamLabelById: Map<number, string>
-): TeamNodeItem | "absent" | null {
-    const { homeSource, awaySource } = node
-    if (
-        homeSource.value === null ||
-        homeSource.value !== awaySource.value ||
-        !(
-            (homeSource.kind === "winner" && awaySource.kind === "loser") ||
-            (homeSource.kind === "loser" && awaySource.kind === "winner")
-        )
-    ) {
-        return null
-    }
-    const firstNum = homeSource.value
-    const first = ctx.nodeByMatchNum.get(firstNum)
-    if (!first) return null
-    const homeUnbeaten = sourceIsUnbeaten(first.homeSource, ctx)
-    const awayUnbeaten = sourceIsUnbeaten(first.awaySource, ctx)
-    if (homeUnbeaten === awayUnbeaten) return null
-
-    if (first.winnerTeamId !== null && first.loserTeamId !== null) {
-        const winnerWasUnbeaten =
-            first.winnerTeamId === first.homeTeamId
-                ? homeUnbeaten
-                : awayUnbeaten
+): TeamNodeItem | null {
+    const { first, firstMatchNum } = reset
+    if (reset.needed !== null) {
         const otherTeamId =
             teamId === first.winnerTeamId
                 ? first.loserTeamId
                 : teamId === first.loserTeamId
                   ? first.winnerTeamId
                   : null
-        if (winnerWasUnbeaten || otherTeamId === null) return "absent"
+        if (!reset.needed || otherTeamId === null) return null
         return {
             role: "play",
             condition: null,
-            opponentLabel: teamLabelById.get(otherTeamId) ?? null
+            opponentLabel: teamLabelById.get(otherTeamId) ?? null,
+            ifNeeded: false
         }
     }
 
     const inHome = sourceContainsTeam(first.homeSource, teamId, ctx)
     const inAway = sourceContainsTeam(first.awaySource, teamId, ctx)
-    if (!inHome.contains && !inAway.contains) return "absent"
+    if (!inHome.contains && !inAway.contains) return null
     const side = inHome.contains ? inHome : inAway
-    const verb = (inHome.contains ? homeUnbeaten : awayUnbeaten)
-        ? "lose"
-        : "win"
+    const verb =
+        reset.unbeaten === (inHome.contains ? "home" : "away") ? "lose" : "win"
     return {
         role: "play",
         condition: side.condition
-            ? `${side.condition} and ${verb} match ${firstNum}`
-            : `If you ${verb} match ${firstNum}`,
+            ? `${side.condition} and ${verb} match ${firstMatchNum}`
+            : `If you ${verb} match ${firstMatchNum}`,
         opponentLabel: resolveOpponentLabel(
             inHome.contains ? first.awaySource : first.homeSource,
             ctx,
             teamLabelById
-        )
+        ),
+        // The condition already says what makes the match happen.
+        ifNeeded: false
     }
 }
 
@@ -319,29 +313,34 @@ export function teamItemsForNode(
     teamLabelById: Map<number, string>
 ): TeamNodeItem[] {
     const items: TeamNodeItem[] = []
-    const playHome = sourceContainsTeam(node.homeSource, teamId, ctx)
-    const playAway = sourceContainsTeam(node.awaySource, teamId, ctx)
-    const reset = resetFinalPlay(node, teamId, ctx, teamLabelById)
-    if (reset !== null) {
-        if (reset !== "absent") items.push(reset)
-    } else if (playHome.contains || playAway.contains) {
-        const side = playHome.contains ? playHome : playAway
-        items.push({
-            role: "play",
-            condition: side.condition,
-            opponentLabel: resolveOpponentLabel(
-                playHome.contains ? node.awaySource : node.homeSource,
-                ctx,
-                teamLabelById
-            )
-        })
+    const reset = resetFinalOf(node, ctx)
+    if (reset) {
+        const play = resetFinalPlay(reset, teamId, ctx, teamLabelById)
+        if (play) items.push(play)
+    } else {
+        const playHome = sourceContainsTeam(node.homeSource, teamId, ctx)
+        const playAway = sourceContainsTeam(node.awaySource, teamId, ctx)
+        if (playHome.contains || playAway.contains) {
+            const side = playHome.contains ? playHome : playAway
+            items.push({
+                role: "play",
+                condition: side.condition,
+                opponentLabel: resolveOpponentLabel(
+                    playHome.contains ? node.awaySource : node.homeSource,
+                    ctx,
+                    teamLabelById
+                ),
+                ifNeeded: false
+            })
+        }
     }
     const work = sourceContainsTeam(node.workSource, teamId, ctx)
-    if (work.contains) {
+    if (work.contains && reset?.needed !== false) {
         items.push({
             role: "work",
             condition: work.condition,
-            opponentLabel: null
+            opponentLabel: null,
+            ifNeeded: reset?.needed === null
         })
     }
     return items
